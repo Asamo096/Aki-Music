@@ -403,6 +403,15 @@ export default {
       );
     },
   },
+  watch: {
+    // 同路由仅参数变化时 Vue Router 会复用组件实例，created() 不再执行。
+    // 没有这个监听，从一个歌单跳到另一个歌单会继续显示上一个歌单的内容
+    // （已实测复现：URL 变了、内容没变、也没有任何请求发出）。
+    // artist.vue 因为有 keep-alive，靠 activated() 覆盖了同样的情况。
+    '$route.params.id'(id) {
+      if (id) this.loadData(id);
+    },
+  },
   created() {
     if (this.$route.name === 'likedSongs') {
       this.loadData(this.data.likedSongPlaylistID);

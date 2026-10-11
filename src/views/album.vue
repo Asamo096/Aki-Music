@@ -233,6 +233,13 @@ export default {
   created() {
     this.loadData(this.$route.params.id);
   },
+  watch: {
+    // 同路由仅参数变化时组件会被复用、created() 不再执行，需要监听参数，
+    // 否则在专辑间跳转会继续显示上一个专辑（同 playlist.vue 的问题）
+    '$route.params.id'(id) {
+      if (id) this.loadData(id);
+    },
+  },
   methods: {
     ...mapMutations(['appendTrackToPlayerList']),
     ...mapActions(['playFirstTrackOnList', 'playTrackOnListByID', 'showToast']),
