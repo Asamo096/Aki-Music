@@ -365,6 +365,17 @@ module.exports = [
     module: require('@neteaseapireborn/api/module/mv_all'),
   },
   {
+    // 新版歌词接口：在老接口基础上额外返回 yrc（逐字歌词）与 ytlrc / yromalrc，
+    // 是 M2 逐字歌词的数据来源。前端尚未调用它，M2 的歌词引擎会以它替换 /lyric。
+    //
+    // ⚠ 必须排在 /lyric **之前**：API 服务用 `app.use(route, ...)` 注册（前缀匹配，
+    // 见 @neteaseapireborn/api 的 server.js），后注册的 /lyric 会吞掉 /lyric/new。
+    // 文件里所有「短路径」都排在「长路径」之后，正是这个原因。
+    identifier: 'lyric_new',
+    route: '/lyric/new',
+    module: require('@neteaseapireborn/api/module/lyric_new'),
+  },
+  {
     identifier: 'lyric',
     route: '/lyric',
     module: require('@neteaseapireborn/api/module/lyric'),

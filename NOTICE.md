@@ -346,6 +346,34 @@ Electron 43 的 npm 包**不再声明 `postinstall`**，二进制改由 `electro
   ProductName=Aki Music / FileVersion=0.1.0 / Company=Asamo096
 - **未验证**：安装包的实际安装过程（留待 M5 在干净环境验证）；macOS / Linux 产物需在对应平台构建
 
+### M1b 补充 · 注册 `/lyric/new`（2026-10-11）
+
+**改动**
+
+- `src/ncmModDef.js` 新增 `lyric_new` 注册（路由 `/lyric/new`，共 125 条）
+  —— 逐字歌词（`yrc`）是 M2 的数据来源，先注册以便验证数据链路，前端尚未调用
+
+**踩到的坑：注册路由是前缀匹配，顺序有约束**
+
+API 服务用 `app.use(route, handler)` 注册路由（见 `@neteaseapireborn/api` 的 `server.js`），
+**前缀匹配而非精确匹配**，因此短路径会吞掉长路径：
+
+- 初版把 `/lyric/new` 排在 `/lyric` 之后 → `/lyric/new` 被 `/lyric` 接管，
+  返回老接口内容（lrc 1436 字符、无 `yrc`），表现为"逐字拿不到"
+- 改为长路径在前后正常
+- 这解释了 `ncmModDef` 中 `/album` 排在一堆 `/album/xxx` 之后、`/api` 排最后的原因：
+  **顺序是刻意安排的**
+
+已扫描全部 125 条路由，确认无其它前缀遮蔽；自查脚本与规则见
+[docs/接口清单与迁移评估.md](./docs/接口清单与迁移评估.md) 附录 A。
+
+**验证（实测）**
+
+- `/lyric/new` 返回 `yrc` 7311 字符、`ytlrc` 612、`yromalrc` 1458（示例 id `1824020871`）
+- `/lyric` 行为未变（无 `yrc`，lrc 1436）—— 注意**两个接口的 lrc 内容不同**，不可假设等价
+- `yrc` 格式：`[行起始ms,行时长ms](词起始ms,词时长ms,0)词…`；行首可能另有若干
+  JSON 元数据行（作曲/编曲/制作人）需先跳过。实测 50 行 = 4 行元数据 + 45 行逐字歌词
+
 ---
 
 ## 4. 待办（阻塞对外发布）
