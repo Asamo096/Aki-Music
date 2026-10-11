@@ -66,8 +66,10 @@
     "x11": "^2.3.0"
   },
   "devDependencies": {
+    "@applemusic-like-lyrics/ttml": "^1.0.1",
     "@types/node": "^24.19.2",
     "@vitejs/plugin-vue2": "^2.3.4",
+    "@xmldom/xmldom": "^0.9.12",
     "babel-eslint": "^10.1.0",
     "electron": "^43.7.5",
     "electron-builder": "^26.15.3",

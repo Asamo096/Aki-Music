@@ -46,8 +46,17 @@ x11
 @types/node  @vitejs/plugin-vue2  babel-eslint  electron  electron-builder
 esbuild  eslint  eslint-config-prettier  eslint-plugin-prettier
 eslint-plugin-vue  husky  png-to-ico  png2icons  prettier  sass  sharp
-typescript  vite  vite-plugin-pwa  vitest
+typescript  vite  vite-plugin-pwa  vitest  @xmldom/xmldom
+@applemusic-like-lyrics/ttml
 ```
+
+> `@applemusic-like-lyrics/ttml` 是**运行时库**（歌词引擎用它解析 TTML），但放在
+> devDependencies —— 因为它会被 Vite 打进渲染进程产物，构建期存在即可。
+> folia-major 也是同样处理（该包同样列在它的 devDependencies 里）。
+> **许可证核验时必须把它算作运行时依赖**。
+>
+> `@xmldom/xmldom` 仅用于测试：AMLL 的 TTML 解析器需要 `DOMParser`，
+> 浏览器自带而 Node 测试环境没有（见 `test/setup.js`）。
 
 > `electron` 与 `electron-builder` 是**构建工具**，必须在 devDependencies
 > ——electron-builder 26 会校验并拒绝打包否则（上游把它们放在 dependencies 里）。

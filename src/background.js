@@ -360,11 +360,12 @@ class Background {
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self'",
       "font-src 'self' data:",
-      // 渲染进程只与本机的 API(同源 /api) 和 CDN 转发(同源 /proxy) 通信；
-      // 唯一的外部 XHR 目标是 Last.fm 的 API（记录与正在播放，见 api/lastfm.js）。
+      // 渲染进程与本机的 API(同源 /api)、CDN 转发(同源 /proxy) 通信；
+      // 外部 XHR 只有两处：Last.fm 的 API（记录与正在播放，见 api/lastfm.js）
+      // 与 AMLL 歌词库（逐字歌词的首选来源，见 src/lyrics/sources/amll.ts）。
       // 其余第三方地址（github / last.fm 授权页 / Vercel 徽章等）走 window.open
       // 或作为 img/media 加载，不受 connect-src 约束。
-      "connect-src 'self' https://ws.audioscrobbler.com",
+      "connect-src 'self' https://ws.audioscrobbler.com https://api.amll.dev",
       "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",

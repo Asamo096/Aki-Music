@@ -141,6 +141,8 @@ export default defineConfig(({ command, mode }) => {
       environment: 'node',
       include: ['test/unit/**/*.spec.js'],
       globals: false,
+      // 注入 DOMParser 等 Node 缺失的浏览器全局（TTML 解析器需要）
+      setupFiles: ['test/setup.js'],
     },
   };
 });

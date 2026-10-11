@@ -7,6 +7,14 @@ import store from '@/store';
 // 直接在开源前改名，避免把上游产品名带进用户数据路径。
 const db = new Dexie('akimusic');
 
+db.version(5).stores({
+  // 歌词引擎的数据源缓存（见 src/lyrics/sources）：
+  // 存**原始返回**而不是解析结果 —— 解析只要几毫秒，而解析器版本升级后
+  // 缓存的原始数据仍可复用，不必让用户清缓存。
+  // payload 为 null 表示「已确认该来源没有这首歌的歌词」（负缓存）。
+  lyricCache: '&key, updateTime',
+});
+
 db.version(4).stores({
   trackDetail: '&id, updateTime',
   lyric: '&id, updateTime',
@@ -202,6 +210,29 @@ export function getLyricFromCache(id) {
   return db.lyric.get(Number(id)).then(result => {
     if (!result) return undefined;
     return result;
+  });
+}
+
+/**
+ * 歌词引擎的原始数据缓存（见 src/lyrics/sources）。
+ *
+ * 键形如 `amll:123456` / `yrc:123456`；存原始返回而不是解析结果，
+ * 这样解析器升级后缓存仍可复用。payload 为 null 表示负缓存
+ * （已确认该来源没有这首歌的歌词），避免每次进歌词页都去打听一次。
+ *
+ * @param {string} key
+ * @returns {Promise<{key: string, payload: any, source: string, updateTime: number} | undefined>}
+ */
+export function getLyricCacheEntry(key) {
+  return db.lyricCache.get(key);
+}
+
+export function putLyricCacheEntry(key, { payload, source }) {
+  return db.lyricCache.put({
+    key,
+    payload,
+    source,
+    updateTime: new Date().getTime(),
   });
 }
 
