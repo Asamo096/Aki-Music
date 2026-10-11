@@ -30,16 +30,15 @@
 @unblockneteasemusic/rust-napi # 原生模块（音源解锁）
 axios            change-case      cli-color         color
 crypto-js        dayjs            dbus-next         dexie
-electron         electron-builder electron-context-menu
-electron-debug   electron-devtools-installer       electron-is-dev
-electron-log     electron-store    electron-updater
+electron         electron-builder electron-devtools-installer
+electron-store   electron-updater
 express          express-fileupload                 express-http-proxy
-extract-zip      howler           js-cookie         jsbi
-lodash           md5              mpris-service     music-metadata
-node-vibrant     nprogress        pac-proxy-agent   plyr
-qrcode           tunnel           vscode-codicons   vue
-vue-clipboard2   vue-i18n         vue-router        vue-slider-component
-vuex             x11
+howler           js-cookie        jsbi              lodash
+md5              mpris-service    node-vibrant      nprogress
+pac-proxy-agent  plyr             qrcode            tunnel
+vscode-codicons  vue              vue-clipboard2    vue-i18n
+vue-router       vue-slider-component               vuex
+x11
 ```
 
 ### 开发依赖（`devDependencies`）
@@ -64,6 +63,13 @@ vite  vite-plugin-pwa
   `discord-rich-presence`（供应链原因，见 NOTICE）、
   `electron-icon-builder`（连带 sharp 0.29 / phantomjs-prebuilt / icon-gen 一并离开依赖树）
 - **改为精确锁定**：`@neteaseapireborn/api` → `4.29.7`
+
+### M1b 的依赖变更
+
+- **升级**：`electron` 13 → 43.7.9、`electron-builder` 23 → 26、`electron-updater` 5 → 6、
+  `electron-devtools-installer` 3 → 4（均需重新核验其传递依赖树）
+- **移除**：`electron-context-menu`、`electron-debug`、`electron-log`、`electron-is-dev`、
+  `extract-zip`、`music-metadata` —— 六者在 `src/` 中**从未被使用**，属上游遗留
 
 ### 待办（核验流程）
 
@@ -93,7 +99,7 @@ vite  vite-plugin-pwa
 | `node-vibrant` | 使用的是 `3.2.1-alpha.1`（alpha 版本），需确认 |
 | `x11` / `mpris-service` / `dbus-next` | 平台特定系统集成依赖，需确认 |
 | `electron` / `electron-builder` 及其子依赖 | 大量传递依赖，需整链核验 |
-| `music-metadata` | 当前未被 `src/` 直接导入，属声明但未使用，核验时可考虑移除 |
+| `electron-builder` 的打包组件 | `electron-winstaller`（Squirrel.Windows）与 `app-builder-bin` 等仅在打包时使用，需确认 |
 
 ---
 

@@ -2,29 +2,36 @@
 #
 # allowBuilds
 #   pnpm 默认拦截依赖的安装脚本（供应链护栏），这里逐个显式表态。
-#   只有真正需要执行脚本的包才放行：
-#   - electron：靠安装脚本下载 Electron 二进制，不放行则 Electron 无法启动
-#   - esbuild：安装脚本会校验/补装平台二进制
-#   其余包的安装脚本只是打印提示或与运行无关，一律拒绝。
+#   真正需要放行的只有 esbuild（安装脚本校验/补装平台二进制）。
+#   其余条目的成因各不相同，注释已分别说明。
 #
-# overrides（沿用上游 yarn 的 resolutions 意图）
-#   electron-builder 固定在大版本 23，与 M1a 阶段的 Electron 13 配套；
-#   icon-gen / degenerator 是传递依赖的兼容性钉子。
+# overrides
+#   degenerator 是 pac-proxy-agent 依赖链上的安全钉子（沿用上游 resolutions 的意图）。
 
 allowBuilds:
-  electron: true
+  # esbuild 靠安装脚本校验/补装平台二进制
   esbuild: true
+  # 以下依赖本身没有安装脚本，条目无实际作用；保留是为了显式声明「可信」，
+  # 也避免 pnpm 每次安装都把它们列为待表态项。
+  #   electron：43 起不再声明 postinstall，改为懒下载（见下方说明）
+  #   sharp：平台二进制来自 optionalDependencies
+  electron: true
+  sharp: true
+  # 以下依赖的安装脚本与运行无关，明确拒绝
   '@parcel/watcher': false
+  abstract-socket: false
   core-js: false
   es5-ext: false
+  electron-winstaller: false # 只服务 Squirrel.Windows，本项目用 portable + nsis
   husky: false
   plyr: false
-  # sharp 用于生成应用图标（scripts/generate-icons.mjs）。
-  # 0.35 起它的平台二进制全部来自 optionalDependencies，本身没有安装脚本，
-  # 因此这条是无实际作用的显式放行——保留它是为了表明「该依赖可信、允许其脚本」。
-  sharp: true
 
 overrides:
-  icon-gen: 3.0.0
   degenerator: 2.2.0
-  electron-builder: ^23.0.0
+
+# 关于 Electron 的二进制（M1b 起）
+#   Electron 43 的 npm 包**没有 postinstall**，二进制由 index.js 在首次
+#   require('electron') 时懒下载（见 electron/index.js 的 downloadElectron）。
+#   因此 pnpm install 不会、也不需要下载 Electron。
+#   上游 Electron 13 的安装脚本依赖旧版 extract-zip，在 Node 24 下会静默失败；
+#   升级到 43 后该问题不复存在（新版用 @electron-internal/extract-zip）。

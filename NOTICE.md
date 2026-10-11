@@ -263,6 +263,37 @@ Vite 不注入 `process.env`，也不 polyfill Node 全局，而上游代码大�
   改为 PNG 尺寸目录 `build/icons/`；mac 补上 `icon: build/icons/icon.icns`
 - `pnpm-workspace.yaml`：移除已离开依赖树的 `phantomjs-prebuilt` 条目
 
+### M1b · Electron 升级（2026-10-11）
+
+**升级**
+
+- Electron 13.6.7 → **43.7.9**（内置 Node 24.21.0）；主进程构建目标 `node14` → `node22`
+- electron-builder `^23.0.0` → `^26.15.3`；electron-updater `^5.0.1` → `^6.8.9`
+- electron-devtools-installer `^3.2` → `^4.0.0`
+- `pnpm-workspace.yaml`：移除 electron-builder 与 icon-gen 的 overrides（其消费者已先后离开依赖树）
+- 同步移除 **6 个从未被使用的死依赖**：`electron-context-menu`、`electron-debug`、
+  `electron-log`、`electron-is-dev`、`extract-zip`、`music-metadata`（后两者在 `src/` 中零引用）
+
+**Electron 43 的安装模型变化（重要，勿再按旧认知排查）**
+
+Electron 43 的 npm 包**不再声明 `postinstall`**，二进制改由 `electron/index.js` 在首次
+`require('electron')` 时**懒下载**。因此：
+
+- `pnpm install` 不下载 Electron，是正常行为
+- `pnpm rebuild electron` 不会有任何动作（没有脚本可跑）
+- 首次 `pnpm dev:electron` 会自动补上二进制（缓存于 `%LOCALAPPDATA%/electron/Cache`）
+
+上游 Electron 13 依赖旧版 `extract-zip`、在 Node 24 下解压静默失败的问题随之消失
+（新版使用 `@electron-internal/extract-zip`）。
+
+**验证**
+
+- Electron 43 + 旧（不安全）配置下应用完整运行：内嵌 API（10754）、静态服务（27232）、
+  Vue 挂载、36 个 SVG symbol、播放器单例、渲染进程零错误
+- **原生模块通过**：`initIpcMain` 在启动时同步执行 `new UNM.Executor()`（rust-napi）未报错
+  ——风险 R1 的关键未知数解决
+- 此阶段渲染进程**仍可访问 `require` 与 `process`**（旧配置尚未拆除），安全改造为下一步
+
 ---
 
 ## 4. 待办（阻塞对外发布）

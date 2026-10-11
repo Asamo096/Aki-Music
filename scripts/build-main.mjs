@@ -27,8 +27,8 @@ export function mainBuildOptions(watch = false) {
     bundle: true,
     platform: 'node',
     format: 'cjs',
-    // M1a 仍是 Electron 13（内置 Node 14）。M1b 升到 Electron 43 后应改为 node22。
-    target: 'node14',
+    // Electron 43 内置 Node 22
+    target: 'node22',
     sourcemap: watch ? 'inline' : false,
     logLevel: 'info',
     // 一切非相对路径的导入都外部化（Node 内建模块本身也会被自动外部化）

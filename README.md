@@ -68,33 +68,27 @@ pnpm icons            # 由 build/icon.png 生成应用图标全套 → build/ic
 
 ## 已知问题
 
-> 这些是 M1a 阶段的已知状态，多数会在 M1b 随 Electron 升级一并解决。
+> M1a 阶段的两项遗留状态已在 M1b 解决：Electron 二进制安装问题（升级到 43 后改为懒下载，
+> 见下）与打包未启用（M1b 启用）。以下为当前状态。
 
-**1. Electron 13 的二进制在 Node 24 下装不上（需手动解压一次）**
+**1. Electron 二进制是懒下载的（这是设计，不是故障）**
 
-Electron 13 的安装脚本依赖 `extract-zip@1.7.0`，在 Node 24 下解压会中途停滞且**静默退出 0**，
-结果是 `node_modules/electron/dist/` 里只有 `locales` 目录。临时处理（已在本机执行过）：
+Electron 43 的 npm 包**不再声明 `postinstall`**，二进制由 `electron/index.js` 在首次
+`require('electron')` 时按需下载（缓存于 `%LOCALAPPDATA%/electron/Cache`）。
+因此 `pnpm install` 不会下载 Electron，首次运行 `pnpm dev:electron` 时会自动补上。
 
-```bash
-cd node_modules/electron
-rm -rf dist && mkdir dist
-curl -sSL -o /tmp/electron.zip \
-  https://npmmirror.com/mirrors/electron/13.6.9/electron-v13.6.9-win32-x64.zip
-unzip -q /tmp/electron.zip -d dist && echo "electron.exe" > path.txt
-```
+> 背景：上游的 Electron 13 依赖旧版 `extract-zip`，在 Node 24 下解压会静默失败
+> （进程退出 0 但二进制没解出来），当时需要手动解压。升级到 Electron 43 后该问题不存在。
 
-M1b 升到 Electron 43 后此问题消失（其安装脚本用现代解压链路）。CI 不受影响：CI 只构建、不启动 Electron。
+**2. 当前仍存在的稳定状态**
 
-**2. 内存中的稳定状态**
-
-- **打包（安装包）尚未配置**：`electron-builder.yml` 已就位但未启用，M1b 与 Electron 升级一起验证。
 - **Web 与桌面构建共用输出目录 `dist/`**：两者是同一个应用的两种目标，同时构建会互相覆盖。
-- **ESLint 仍是 6**：能运行且已清零 error，升级到 9/Biome 安排在 M1b。
+- **ESLint 仍是 6**：能运行且已清零 error，升级到 9/Biome 安排在后续。
 - **Discord Rich Presence 暂时移除**：上游依赖的 `discord-rich-presence@0.0.8` 有一个走 git 仓库解析的
   子依赖（该包已从 npm 撤下），pnpm 默认拒绝这类异源子依赖。该功能此前已停用，无功能损失；
   M5 会用 `@xhayper/discord-rpc` 重新实现。
 - **`@neteaseapireborn/api` 锁定为 `4.29.7`**：该包 4.29.10 之后是 2～6 个文件的桩包，
-  用 `^4.29.7` 会解析到桩包导致内嵌 API 完全不可用，因此精确锁定。
+  用 `^4.29.7` 会解析到桩包导致内嵌 API 完全不可用，因此精确锁定（M1b 将整体替换为 api-enhanced）。
 - **图标只替换了应用图标**：窗口 / 任务栏 / 程序坞 / 安装包用的图标已换为自有图标
   （母图 `build/icon.png`，`pnpm icons` 生成全套）。**PWA / favicon 图标与托盘图标仍是上游资产**——
   托盘图标需要专门的简化单色设计（彩色详图缩到 16–20px 会糊），留待后续一并处理，见 NOTICE §2。
