@@ -41,12 +41,6 @@ importers:
       dexie:
         specifier: ^3.0.3
         version: 3.2.7
-      electron:
-        specifier: ^43.7.5
-        version: 43.7.9
-      electron-builder:
-        specifier: ^26.15.3
-        version: 26.15.3(electron-builder-squirrel-windows@26.15.3)
       electron-devtools-installer:
         specifier: ^4.0.0
         version: 4.0.0
@@ -135,6 +129,12 @@ importers:
       babel-eslint:
         specifier: ^10.1.0
         version: 10.1.0(eslint@6.8.0)
+      electron:
+        specifier: ^43.7.5
+        version: 43.7.9
+      electron-builder:
+        specifier: ^26.15.3
+        version: 26.15.3(electron-builder-squirrel-windows@26.15.3)
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2

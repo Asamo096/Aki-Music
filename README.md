@@ -3,10 +3,13 @@
 > 一个桌面音乐播放器，基于 [YesPlayMusic](https://github.com/qier222/YesPlayMusic) 二次开发。
 > 目标是保留 YesPlayMusic 完整的功能骨架，并把全屏歌词体验做到 [Folia](https://github.com/chthollyphile/folia-major) 的水准。
 
-**项目状态：M0（合规基线）与 M1a（构建链升级）已完成，尚不可发布。**
-工具链已换成 Vite + esbuild，应用可构建、可启动、可运行；**桌面应用图标已换为自有图标**；
-功能代码仍是上游原样。
-后续按 [二开计划书](./docs/二开计划书.md) 推进（M1b 起：Electron 升级、安全改造、api-enhanced 迁移）。
+**项目状态：M0 / M1a / M1b 主体已完成（尚余 api-enhanced 迁移），不可对外发布。**
+
+工具链已换成 Vite + esbuild，Electron 已升到 43，**渲染进程已沙箱化**
+（无 `require`/`process`，IPC 走白名单桥，开启 `webSecurity` 并配置 CSP），
+**Windows 安装包可产出**，桌面应用图标已换为自有图标。
+功能代码仍是上游原样，尚不可对外发布。
+后续：api-enhanced 迁移收尾 M1b，然后进入 M2（歌词引擎）。
 
 ---
 
@@ -28,7 +31,7 @@ MV 播放、音乐云盘、音源降级链与 UnblockNeteaseMusic 解锁、Last.
 
 ## 技术栈
 
-| 层 | 现状（M1a） | 目标 |
+| 层 | 现状 | 目标 |
 |---|---|---|
 | 运行时 | **Node 24**（`.nvmrc`） | 同 |
 | 包管理 | **pnpm 11** | 同 |
@@ -36,9 +39,10 @@ MV 播放、音乐云盘、音源降级链与 UnblockNeteaseMusic 解锁、Last.
 | 构建（主进程） | **esbuild**（`scripts/build-main.mjs`，依赖外部化） | 同 |
 | 框架 | **Vue 2.7.16** | Vue 3（M6） |
 | 语言 | JavaScript + **渐进 TypeScript**（`allowJs`） | 全量 TS |
-| 桌面 | Electron 13.6.7 | **Electron 43.7.5**（M1b） |
-| 后端起 | 内嵌 `@neteaseapireborn/api` 4.29.7 @ `127.0.0.1:10754` | 内嵌 `api-enhanced`（M1b） |
-| 测试 | 无 | Vitest + Playwright（M1b 起） |
+| 桌面 | **Electron 43.7.9**，渲染进程已沙箱化（preload + contextBridge + 白名单 IPC + CSP） | 同 |
+| 打包 | **electron-builder 26**（Windows 已产出安装包） | 三平台产物（M5） |
+| 后端 | 内嵌 `@neteaseapireborn/api` 4.29.7 @ `127.0.0.1:10754` | 内嵌 `api-enhanced`（M1b 收尾） |
+| 测试 | 无 | Vitest + Playwright |
 
 详细分析见 [技术栈分析](./docs/技术栈分析.md)。
 
@@ -49,10 +53,15 @@ pnpm install
 
 pnpm dev              # Web 开发（http://localhost:8080，需另起 API 在 3000 端口）
 pnpm dev:electron     # 桌面开发（一条命令拉起 Vite + 主进程构建 + Electron）
+                      #   可透传 Electron 参数：pnpm dev:electron -- --remote-debugging-port=9222
 
 pnpm build            # 构建 Web 产物 → dist/
-pnpm build:electron   # 构建桌面产物 → dist/（渲染）+ dist-electron/（主进程）
-pnpm build:main       # 只构建主进程
+pnpm build:electron   # 构建桌面产物 → dist/（渲染）+ dist-electron/（主进程/预加载）
+pnpm build:main       # 只构建主进程与预加载脚本
+
+pnpm electron:build       # 打包当前平台安装包 → dist_electron/
+pnpm electron:build:win   # 只打 Windows
+pnpm electron:build:dir   # 只生成未打包目录（验证配置，最快）
 
 pnpm typecheck        # tsc --noEmit
 pnpm lint             # ESLint
@@ -82,6 +91,12 @@ Electron 43 的 npm 包**不再声明 `postinstall`**，二进制由 `electron/i
 
 **2. 当前仍存在的稳定状态**
 
+- **打包体积偏大（约 124 MB/安装包）**：产物内含全部 13 个平台的
+  `@unblockneteasemusic/rust-napi-*` 预编译二进制（约 93 MB）。按目标平台过滤是可行的优化，
+  但静态 `files` 无法按平台条件化，需要 afterPack 钩子，留待后续处理。
+- **安装包只在 Windows 上验证过**：`electron-builder.yml` 已含 macOS / Linux 配置，
+  但必须在对应平台上构建才能验证；安装包的**实际安装过程**（oneClick + perMachine 会写入系统
+  并有 UAC 提示）留待 M5 发布前在干净环境验证。
 - **Web 与桌面构建共用输出目录 `dist/`**：两者是同一个应用的两种目标，同时构建会互相覆盖。
 - **ESLint 仍是 6**：能运行且已清零 error，升级到 9/Biome 安排在后续。
 - **Discord Rich Presence 暂时移除**：上游依赖的 `discord-rich-presence@0.0.8` 有一个走 git 仓库解析的

@@ -1,13 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# electron-builder 打包配置。
+# electron-builder 打包配置（M1b 起启用）。
 #
-# ⚠ M1a 阶段**尚未启用**：打包（安装包生成）按计划推迟到 M1b，
-#   与 Electron 13 → 43 的升级一起验证。
-#   内容来自 M0 时点的 vue.config.js（已做品牌与 publish 调整），
-#   目的是把配置意图留在仓库里，而不是只存在于 git 历史。
-#
-# M1b 启用方式：增加打包脚本 `electron-builder --config electron-builder.yml`
+# 构建：pnpm electron:build   （先构建渲染产物与主进程，再交给 electron-builder）
+# 单独验证文件布局：pnpm electron:build:dir
 #
 # 图标：母图为 build/icon.png，全套由 `pnpm icons` 生成到 build/icons/
 #   （scripts/generate-icons.mjs，取代上游的 electron-icon-builder）
@@ -25,9 +21,28 @@ asar: true
 directories:
   output: dist_electron
 
-# TODO(M1b): 显式声明 files 白名单（dist/ + dist-electron/ + 生产依赖），
-# 并确认外部化依赖（express / electron-store 等）都能被正确打入产物。
-# 此处先沿用 electron-builder 默认行为。
+# 打入产物的文件。
+# 主进程采用「依赖外部化」策略（见 scripts/build-main.mjs），因此运行时依赖
+# 必须随包分发——electron-builder 会自动收集 package.json 的 dependencies，
+# 无需在此列出 node_modules。
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+  - '!**/*.map'
+
+# 原生扩展不能从 asar 内加载，必须解包到磁盘
+asarUnpack:
+  - '**/*.node'
+
+# 不重建原生模块。本项目的原生依赖都有现成产物或可安全缺失：
+#   - @unblockneteasemusic/rust-napi：经 optionalDependencies 分发各平台
+#     预编译二进制（win32-x64-msvc / linux-x64-gnu / darwin-x64 …），无需编译
+#   - abstract-socket：dbus-next 的**可选**依赖，且源码明确只支持 Linux
+#     （Windows 上编译会直接 #error）。缺失时 dbus-next 自动降级，
+#     不影响 MPRIS 可用性。
+# 否则在 Windows 上打包会因为 abstract-socket 编译失败而中断。
+npmRebuild: false
 
 mac:
   target:
@@ -43,7 +58,10 @@ win:
       arch: [x64]
     - target: nsis
       arch: [x64]
-  publisherName: Asamo096
+  # electron-builder 26 起，签名/发行者相关选项从 win 顶层移到 signtoolOptions 下
+  # （win.publisherName 已不再合法，会被 schema 校验拒绝）
+  signtoolOptions:
+    publisherName: Asamo096
   icon: build/icons/icon.ico
 
 linux:
@@ -71,6 +89,12 @@ dmg:
   icon: build/icons/icon.icns
 
 nsis:
+  # portable 与 nsis 的扩展名都是 .exe，若共用顶层 artifactName 会互相覆盖，
+  # 因此这里按 target 分别命名
+  artifactName: aki-music-${version}-setup.${ext}
   oneClick: true
   perMachine: true
   deleteAppDataOnUninstall: true
+
+portable:
+  artifactName: aki-music-${version}-portable.${ext}

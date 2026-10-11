@@ -30,8 +30,7 @@
 @unblockneteasemusic/rust-napi # 原生模块（音源解锁）
 axios            change-case      cli-color         color
 crypto-js        dayjs            dbus-next         dexie
-electron         electron-builder electron-devtools-installer
-electron-store   electron-updater
+electron-devtools-installer        electron-store    electron-updater
 express          express-fileupload                 express-http-proxy
 howler           js-cookie        jsbi              lodash
 md5              mpris-service    node-vibrant      nprogress
@@ -44,12 +43,15 @@ x11
 ### 开发依赖（`devDependencies`）
 
 ```
-@types/node  @vitejs/plugin-vue2  babel-eslint  esbuild  eslint
-eslint-config-prettier  eslint-plugin-prettier  eslint-plugin-vue
-husky  png-to-ico  png2icons  prettier  sass  sharp  typescript
-vite  vite-plugin-pwa
+@types/node  @vitejs/plugin-vue2  babel-eslint  electron  electron-builder
+esbuild  eslint  eslint-config-prettier  eslint-plugin-prettier
+eslint-plugin-vue  husky  png-to-ico  png2icons  prettier  sass  sharp
+typescript  vite  vite-plugin-pwa
 ```
 
+> `electron` 与 `electron-builder` 是**构建工具**，必须在 devDependencies
+> ——electron-builder 26 会校验并拒绝打包否则（上游把它们放在 dependencies 里）。
+>
 > `sharp` 用于生成应用图标（`scripts/generate-icons.mjs`），其平台二进制来自
 > `optionalDependencies`（`@img/sharp-*`），会随安装一并进入 —— 许可证核验时
 > 需连同这些可选依赖一起看。

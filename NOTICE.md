@@ -294,6 +294,58 @@ Electron 43 的 npm 包**不再声明 `postinstall`**，二进制改由 `electro
   ——风险 R1 的关键未知数解决
 - 此阶段渲染进程**仍可访问 `require` 与 `process`**（旧配置尚未拆除），安全改造为下一步
 
+### M1b · 渲染进程沙箱化与启用打包（2026-10-11）
+
+**安全模型（拆掉 nodeIntegration:true + contextIsolation:false + webSecurity:false）**
+
+- 新增 `src/preload.js`：contextBridge 暴露 `window.aki`，IPC 按**通道白名单**放行
+  （23 send / 1 invoke / 16 on，与主进程 ipcMain 注册一一对应）；
+  `on` 回调不透出 IpcRendererEvent，改传空对象占位，故 16 处既有回调签名无需改动
+- 新增 `src/utils/electronBridge.js`：渲染进程访问桥的统一入口，取代 8 处 `window.require`
+- last.fm 登录窗口改用 `setWindowOpenHandler`（`new-window` 事件在 Electron 22 已移除）；
+  该窗口加载远端页面，故不挂载 preload 且保持 `sandbox: true`
+- 平台判断收敛到 `utils/platform.js`（优先 `window.aki.platform`，主进程回退 `process.platform`），
+  因不再出现字面量 `process.platform`，vite.config 中该变量的 define 已删除
+- 新增 CSP（仅非开发模式；开发模式 HMR 需要更宽松策略）
+
+**webSecurity 开启的连锁处理（不做会导致音频缓存静默失效）**
+
+- 新增本地 `/proxy` 转发端点（27232）：域名白名单（`*.music.126.net`、`*.bilivideo.com`）
+  + Range 透传 + 流式转发；非白名单一律 403（含本地自指，防 SSRF 循环）
+- `utils/db.js` 的音频与封面预热改经 `/proxy`（`data:`/`blob:` 原样放行）
+- 桌面开发的 API 地址由跨源的 `http://127.0.0.1:10754` 改为同源 `/api`，由 dev server 代理转发
+
+**启用打包**
+
+- `electron-builder.yml` 生效；新增脚本 `electron:build` / `electron:build:win` / `electron:build:dir`
+- `files` 显式声明 `dist/**`、`dist-electron/**`、`package.json`（依赖由 electron-builder
+  按 dependencies 自动收集——主进程采用依赖外部化策略）
+- `asarUnpack: ['**/*.node']`：原生扩展不能从 asar 内加载
+- `npmRebuild: false`：原生依赖均有现成产物或可安全缺失（详见配置内注释）
+- `package.json`：`electron` 与 `electron-builder` 由 dependencies 移入 devDependencies
+
+**打包中修掉的配置缺陷（上游遗留或版本演进所致）**
+
+| 问题 | 处理 |
+|---|---|
+| `electron` / `electron-builder` 放在 dependencies | electron-builder 26 直接报错拒绝；移入 devDependencies |
+| `win.publisherName` 顶层字段 | electron-builder 26 已移除该位置，迁至 `win.signtoolOptions.publisherName` |
+| nsis 与 portable 扩展名都是 .exe，共用顶层 `artifactName` 会互相覆盖 | 分别设置 `nsis.artifactName`（-setup）与 `portable.artifactName`（-portable） |
+| `abstract-socket` 在 Windows 上编译直接 `#error "Only Linux is supported"`，导致打包中断 | `npmRebuild: false`；它是 dbus-next 的**可选**依赖且仅支持 Linux，缺失时自动降级 |
+| 产物塞入全部 13 个平台的 rust-napi 预编译二进制（约 93 MB） | 记为体积优化待办（需 afterPack 钩子，静态配置无法按平台条件化） |
+
+**验证**
+
+- `--dir` 与完整安装包两条路径跑通：`aki-music-0.1.0-setup.exe`（124.2 MB，NSIS）、
+  `aki-music-0.1.0-portable.exe`（124.0 MB）
+- **安全模型在三种模式下均验证**（生产本地服务 / 开发 Vite / 打包版）：渲染进程
+  `require`、`process`、`Buffer` 全部不可用；`window.aki` 可用且 platform=win32；功能完好零异常。
+  打包版零错误零警告（Electron 安全警告在 `app.isPackaged` 为 true 后不再出现）
+- `/proxy`：非白名单 403（含本地自指）；白名单 CDN 封面经其取回 200 / image-jpg
+- **图标端到端验证**：从 `setup.exe` 提取出的图标确认为自有图标；三个可执行文件元数据均为
+  ProductName=Aki Music / FileVersion=0.1.0 / Company=Asamo096
+- **未验证**：安装包的实际安装过程（留待 M5 在干净环境验证）；macOS / Linux 产物需在对应平台构建
+
 ---
 
 ## 4. 待办（阻塞对外发布）
