@@ -240,9 +240,16 @@
             <option :value="true">
               {{ $t('settings.lyricsBackground.on') }}
             </option>
-            <option value="blur"> 模糊封面 </option>
+            <option value="blur">
+              {{ $t('settings.lyricsBackground.blur') }}
+            </option>
             <option value="dynamic">
               {{ $t('settings.lyricsBackground.dynamic') }}
+            </option>
+            <option value="fluid">
+              {{ $t('settings.lyricsBackground.fluid') }} ({{
+                $t('settings.lyricsBackground.cost.high')
+              }})
             </option>
           </select>
         </div>

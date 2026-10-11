@@ -326,12 +326,13 @@ export default {
     }
   }
 
-  /* 逐字扫过：进度来自 rAF 写入的 --p，渐变硬边界扫过字面 */
+  /* 逐字扫过：进度来自 rAF 写入的 --p，渐变硬边界扫过字面。
+     亮色用 --lyric-accent（多色背景会把它设成封面主题主色），未设置时回落 currentColor */
   &.word-timed .line.active .text .word {
     background-image: linear-gradient(
       90deg,
-      currentColor 0%,
-      currentColor calc(var(--p, 0) * 100%),
+      var(--lyric-accent, currentColor) 0%,
+      var(--lyric-accent, currentColor) calc(var(--p, 0) * 100%),
       color-mix(in srgb, currentColor 26%, transparent) calc(var(--p, 0) * 100%),
       color-mix(in srgb, currentColor 26%, transparent) 100%
     );

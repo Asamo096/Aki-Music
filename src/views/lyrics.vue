@@ -6,6 +6,15 @@
       :data-theme="theme"
     >
       <div
+        v-if="settings.lyricsBackground === 'fluid'"
+        class="fluid-background-layer"
+      >
+        <LyricsBackgroundFluid
+          :cover-url="bgImageUrl"
+          @theme="onBackgroundTheme"
+        />
+      </div>
+      <div
         v-if="
           (settings.lyricsBackground === 'blur') |
             (settings.lyricsBackground === 'dynamic')
@@ -223,6 +232,40 @@
               >
                 <span class="lyric-switch-icon">音</span>
               </button-icon>
+              <!-- 背景风格开关（M2-C）：与设置页共用同一份注册表 -->
+              <div class="background-style-switch">
+                <button-icon
+                  :title="$t('settings.lyricsBackground.text')"
+                  :class="{ active: backgroundMenuOpen }"
+                  @click.native="backgroundMenuOpen = !backgroundMenuOpen"
+                >
+                  <span class="lyric-switch-icon">景</span>
+                </button-icon>
+                <div v-if="backgroundMenuOpen" class="background-style-menu">
+                  <div class="menu-title">
+                    {{ $t('settings.lyricsBackground.text') }}
+                  </div>
+                  <div
+                    v-for="style in backgroundStyles"
+                    :key="String(style.value)"
+                    class="menu-item"
+                    :class="{
+                      active: style.value === settings.lyricsBackground,
+                    }"
+                    @click="chooseBackground(style.value)"
+                  >
+                    <span class="label">
+                      {{ $t(`settings.lyricsBackground.${style.labelKey}`) }}
+                      <span v-if="style.isNew" class="tag">{{
+                        $t('settings.lyricsBackground.new')
+                      }}</span>
+                    </span>
+                    <span class="cost" :class="`cost-${style.cost}`">{{
+                      $t(`settings.lyricsBackground.cost.${style.cost}`)
+                    }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -298,6 +341,11 @@ import {
 } from '@/lyrics';
 import { resolveLyricsFontFamily } from '@/settings/fontStacks';
 import { restoreUploadedFont } from '@/settings/customFont';
+import LyricsBackgroundFluid from '@/components/LyricsBackgroundFluid.vue';
+import {
+  LYRIC_BACKGROUND_STYLES,
+  isDarkBackgroundStyle,
+} from '@/settings/lyricBackground';
 import ButtonIcon from '@/components/ButtonIcon.vue';
 import * as Vibrant from 'node-vibrant/dist/vibrant.worker.min.js';
 import Color from 'color';
@@ -316,6 +364,7 @@ export default {
     ButtonIcon,
     ContextMenu,
     LyricLines,
+    LyricsBackgroundFluid,
   },
   data() {
     return {
@@ -328,6 +377,10 @@ export default {
       highlightLyricIndex: -1,
       minimize: true,
       background: '',
+      /** 歌词页内的背景风格开关 */
+      backgroundMenuOpen: false,
+      /** 多色背景取到的主题色：让逐字扫过也用上封面的颜色 */
+      coverAccent: '',
       date: this.formatTime(new Date()),
       isFullscreen: !!document.fullscreenElement,
       rightClickLyric: null,
@@ -392,6 +445,8 @@ export default {
         fontSize: `${this.$store.state.settings.lyricFontSize || 28}px`,
         // 字体（M2-B）：设置 → CSS 栈的统一解析入口，见 settings/fontStacks.ts
         fontFamily: resolveLyricsFontFamily(this.settings),
+        // 多色背景给了主题主色时，逐字扫过用它（其它风格下留空 → 回落到 currentColor）
+        '--lyric-accent': this.coverAccent || null,
       };
     },
     noLyric() {
@@ -406,7 +461,13 @@ export default {
       return this.currentTrack?.al || { id: 0, name: 'unknown' };
     },
     theme() {
-      return this.settings.lyricsBackground === true ? 'dark' : 'auto';
+      // 深色背景（取色渐变 / 多色模糊）必须用深色主题，否则浅色文字读不出来
+      return isDarkBackgroundStyle(this.settings.lyricsBackground)
+        ? 'dark'
+        : 'auto';
+    },
+    backgroundStyles() {
+      return LYRIC_BACKGROUND_STYLES;
     },
   },
   watch: {
@@ -572,6 +633,22 @@ export default {
     switchLyricType() {
       this.lyricType =
         this.lyricType === 'translation' ? 'romaPronunciation' : 'translation';
+    },
+    /** 歌词页内的背景风格切换（与设置页共用 settings.lyricsBackground） */
+    chooseBackground(style) {
+      this.$store.commit('updateSettings', {
+        key: 'lyricsBackground',
+        value: style,
+      });
+      this.backgroundMenuOpen = false;
+      // 离开多色风格时清掉主题主色，避免它继续染着逐字颜色
+      if (style !== 'fluid') this.coverAccent = '';
+      // 渐变背景的颜色是按需计算的，切回来时补算一次
+      this.getCoverColor();
+    },
+    /** 多色背景组件取到主题后回传主色 */
+    onBackgroundTheme(theme) {
+      this.coverAccent = theme?.primaryColor ?? '';
     },
     formatTrackTime(value) {
       return formatTrackTime(value);
@@ -883,6 +960,65 @@ export default {
         font-size: 14px;
         line-height: 14px;
         opacity: 0.88;
+      }
+
+      /* 背景风格开关（M2-C）：按钮 + 下拉，与设置页同一份注册表 */
+      .background-style-switch {
+        position: relative;
+
+        .background-style-menu {
+          position: absolute;
+          bottom: 42px;
+          left: 50%;
+          transform: translateX(-50%);
+          min-width: 190px;
+          padding: 8px;
+          border-radius: 12px;
+          background: var(--color-secondary-bg, #2a2a2e);
+          box-shadow: 0 8px 28px rgba(0, 0, 0, 0.36);
+          z-index: 400;
+
+          .menu-title {
+            padding: 4px 8px 8px;
+            font-size: 12px;
+            opacity: 0.5;
+            white-space: nowrap;
+          }
+
+          .menu-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 7px 8px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            white-space: nowrap;
+
+            &:hover {
+              background: var(--color-shape-color);
+            }
+
+            &.active .label {
+              color: var(--color-primary);
+            }
+
+            .tag {
+              margin-left: 6px;
+              padding: 1px 5px;
+              border-radius: 5px;
+              font-size: 10px;
+              background: var(--color-primary);
+              color: #fff;
+            }
+
+            .cost {
+              font-size: 11px;
+              opacity: 0.45;
+            }
+          }
+        }
       }
     }
   }

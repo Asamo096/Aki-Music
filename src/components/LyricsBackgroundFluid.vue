@@ -1,0 +1,303 @@
+<template>
+  <div class="fluid-background" aria-hidden="true">
+    <!-- 封面模糊层：源图先缩到 384px（单块纹理，避免大图分块上传导致的网格闪烁） -->
+    <div
+      v-for="layer in layers"
+      :key="layer.key"
+      class="cover-layer"
+      :class="{ visible: layer.visible }"
+    >
+      <img :src="layer.url" alt="" decoding="async" draggable="false" />
+    </div>
+    <!-- 取不到封面时的纯色兜底 -->
+    <div
+      v-if="layers.length === 0"
+      class="cover-fallback"
+      :style="{ backgroundColor: theme.backgroundColor }"
+    />
+
+    <!-- 多颜色色块：颜色与运动速度都来自封面主题（见 visual/coverTheme.ts） -->
+    <div class="blobs" :style="blobStyle">
+      <div class="blob blob-a" />
+      <div class="blob blob-b" />
+      <div class="blob blob-c" />
+    </div>
+
+    <!-- 整屏调和层：让多色与封面糊在一起，而不是各说各话 -->
+    <div class="tone" :style="toneStyle" />
+  </div>
+</template>
+
+<script>
+/**
+ * 多色动态模糊背景（M2-C）。
+ *
+ * 技术要点来自 folia 的 FluidBackground（AGPL-3.0）：
+ *   1. **不用 backdrop-filter**：整屏 backdrop-filter 在 Electron 里代价极高（每帧回读背景），
+ *      改用「封面缩略图 + blur(40px) + scale(1.5)」——效果接近，成本低一个量级
+ *   2. **模糊源先降采样到 384px**：40px 的模糊本来就看不出更细的细节，而大图纹理会分块上传、
+ *      逐块显示（这就是"新歌进来时网格闪烁"的根因）；384px 是一块纹理，任何封面都不闪
+ *   3. **切歌交叉淡入**：新封面解码完成后再上屏，旧图层等淡入结束才摘掉
+ *   4. **透明度加在包装层而不是模糊层**：直接给 blur 元素做透明度动画会让浏览器每帧重算模糊
+ *
+ * 情绪档位（motionDuration / blobStrength）由封面调色板推断，见 coverTheme.ts；
+ * 无音频图，因此运动是纯视觉的呼吸/漂移，不随节拍变化。
+ */
+import { FALLBACK_COVER_THEME } from '@/visual/coverTheme';
+import { extractCoverTheme } from '@/visual/coverThemeExtract';
+
+/** 模糊源的最长边（见上方注释第 2 点） */
+const COVER_BLUR_SOURCE_MAX = 384;
+/** 交叉淡入时长（与 CSS 里的 transition 保持一致） */
+const CROSS_FADE_MS = 1500;
+
+const buildDownscaledCover = (coverUrl, maxSize) =>
+  new Promise(resolve => {
+    if (typeof document === 'undefined') {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.decoding = 'async';
+    img.onload = () => {
+      try {
+        const naturalWidth = img.naturalWidth || img.width;
+        const naturalHeight = img.naturalHeight || img.height;
+        if (!naturalWidth || !naturalHeight) {
+          resolve(null);
+          return;
+        }
+        const scale = Math.min(
+          1,
+          maxSize / Math.max(naturalWidth, naturalHeight)
+        );
+        const width = Math.max(1, Math.round(naturalWidth * scale));
+        const height = Math.max(1, Math.round(naturalHeight * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      } catch (error) {
+        // 跨域且没有 CORS 头的封面会污染画布：退回原图（只是可能闪烁，不影响可用性）
+        console.warn('[background] 封面降采样失败，退回原图', error);
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = coverUrl;
+  });
+
+export default {
+  name: 'LyricsBackgroundFluid',
+  props: {
+    /** 当前曲目封面（带尺寸参数的原图 URL） */
+    coverUrl: {
+      type: String,
+      default: '',
+    },
+  },
+  data() {
+    return {
+      theme: { ...FALLBACK_COVER_THEME },
+      layers: [],
+      layerKey: 0,
+    };
+  },
+  computed: {
+    blobStyle() {
+      return {
+        '--blob-primary': this.theme.primaryColor,
+        '--blob-secondary': this.theme.secondaryColor,
+        '--blob-accent': this.theme.accentColor,
+        '--blob-duration': `${this.theme.motionDuration}s`,
+        '--blob-strength': String(this.theme.blobStrength),
+      };
+    },
+    toneStyle() {
+      return {
+        background: `linear-gradient(to bottom right, ${this.theme.primaryColor}, transparent, ${this.theme.secondaryColor})`,
+      };
+    },
+  },
+  watch: {
+    coverUrl: {
+      immediate: true,
+      handler(url) {
+        this.loadCover(url);
+      },
+    },
+  },
+  beforeDestroy() {
+    clearTimeout(this.pruneTimer);
+  },
+  methods: {
+    async loadCover(url) {
+      if (!url) {
+        this.theme = { ...FALLBACK_COVER_THEME };
+        this.layers = [];
+        return;
+      }
+
+      const key = ++this.layerKey;
+      // 主题与图层并行：颜色变化和图片淡入不必互相等待
+      extractCoverTheme(url).then(theme => {
+        if (key !== this.layerKey) return;
+        this.theme = theme;
+        /** 主题回传：歌词页用它给逐字扫过染色 */
+        this.$emit('theme', theme);
+      });
+
+      const source =
+        (await buildDownscaledCover(url, COVER_BLUR_SOURCE_MAX)) ?? url;
+      if (key !== this.layerKey) return;
+
+      const layer = { key, url: source, visible: false };
+      this.layers.push(layer);
+      await this.$nextTick();
+      const mine = this.layers.find(item => item.key === key);
+      if (mine) mine.visible = true;
+
+      clearTimeout(this.pruneTimer);
+      this.pruneTimer = setTimeout(() => {
+        this.layers = this.layers.filter(item => item.key === key);
+      }, CROSS_FADE_MS + 120);
+    },
+  },
+};
+</script>
+
+<style lang="scss" scoped>
+.fluid-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+  isolation: isolate;
+  contain: paint;
+  transform: translateZ(0);
+}
+
+.cover-layer,
+.cover-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cover-layer {
+  // 透明度加在包装层：模糊层本身保持"烘焙"状态，不参与每帧重绘
+  opacity: 0;
+  transition: opacity 1.5s ease-in-out;
+  will-change: opacity;
+
+  &.visible {
+    opacity: 1;
+  }
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    // scale 是为了盖住模糊在边缘造成的透明带
+    filter: blur(40px);
+    transform: scale(1.5) translateZ(0);
+    backface-visibility: hidden;
+  }
+}
+
+.cover-fallback {
+  opacity: 0.8;
+}
+
+.blobs {
+  position: absolute;
+  inset: -20%;
+  opacity: calc(0.35 + var(--blob-strength, 0.5) * 0.45);
+  mix-blend-mode: screen;
+  will-change: transform;
+
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    animation: blob-drift var(--blob-duration, 26s) ease-in-out infinite;
+    will-change: transform;
+
+    &.blob-a {
+      top: 8%;
+      left: 6%;
+      width: 58%;
+      height: 58%;
+      background: radial-gradient(
+        circle at 50% 50%,
+        var(--blob-primary, #5b6cff) 0%,
+        transparent 68%
+      );
+      animation-delay: -4s;
+    }
+
+    &.blob-b {
+      top: 28%;
+      right: 4%;
+      width: 54%;
+      height: 54%;
+      background: radial-gradient(
+        circle at 50% 50%,
+        var(--blob-secondary, #7f8cff) 0%,
+        transparent 70%
+      );
+      animation-delay: -11s;
+    }
+
+    &.blob-c {
+      bottom: 4%;
+      left: 22%;
+      width: 50%;
+      height: 50%;
+      background: radial-gradient(
+        circle at 50% 50%,
+        var(--blob-accent, #ff7ac6) 0%,
+        transparent 72%
+      );
+      animation-delay: -17s;
+    }
+  }
+}
+
+.tone {
+  position: absolute;
+  inset: 0;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+}
+
+@keyframes blob-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(4%, -5%, 0) scale(1.12);
+  }
+  66% {
+    transform: translate3d(-5%, 4%, 0) scale(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blobs .blob {
+    animation: none;
+  }
+}
+</style>

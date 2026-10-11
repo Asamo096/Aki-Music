@@ -226,7 +226,11 @@ export default {
       text: '显示歌词背景',
       off: '关闭',
       on: '打开',
+      blur: '模糊封面',
       dynamic: '动态（GPU 占用较高）',
+      fluid: '多色动态模糊（按封面取色，占用最高）',
+      new: '新',
+      cost: { low: '低开销', medium: '中开销', high: '高开销' },
     },
     showLyricsTime: '显示当前时间',
     closeAppOption: {

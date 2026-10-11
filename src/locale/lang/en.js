@@ -233,7 +233,11 @@ export default {
       text: 'Show Lyrics Background',
       off: 'Off',
       on: 'On',
-      dynamic: 'Dynamic (High GPU usage)',
+      blur: 'Blurred Cover',
+      dynamic: 'Dynamic (High GPU)',
+      fluid: 'Multicolor Fluid (Cover Colors, Highest Cost)',
+      new: 'New',
+      cost: { low: 'Low Cost', medium: 'Medium Cost', high: 'High Cost' },
     },
     closeAppOption: {
       text: 'Close App...',

@@ -222,10 +222,18 @@ export default {
     enableReversedMode: 'Enable Reversed Mode (Experimental)',
     enableCustomTitlebar: 'Enable custom title bar (Need restart)',
     lyricsBackground: {
-      text: 'Şarkı Sözleri Arka Planını Göster',
-      off: 'kapalı',
-      on: 'açık',
-      dynamic: 'dinamik(Yüksek GPU kullanımı)',
+      text: 'Şarkı Sözü Arka Planını Göster',
+      off: 'Kapalı',
+      on: 'Açık',
+      blur: 'Bulanık Kapak',
+      dynamic: 'Dinamik (Yüksek GPU)',
+      fluid: 'Çok Renkli Akışkan (Kapak Renkleri, En Yüksek Maliyet)',
+      new: 'Yeni',
+      cost: {
+        low: 'Düşük Maliyet',
+        medium: 'Orta Maliyet',
+        high: 'Yüksek Maliyet',
+      },
     },
     closeAppOption: {
       text: 'Close App...',

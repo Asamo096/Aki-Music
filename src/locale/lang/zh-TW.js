@@ -223,8 +223,12 @@ export default {
     lyricsBackground: {
       text: '顯示歌詞背景',
       off: '關閉',
-      on: '開啟',
-      dynamic: '動態（GPU 占用較高）',
+      on: '打開',
+      blur: '模糊封面',
+      dynamic: '動態（GPU 佔用較高）',
+      fluid: '多色動態模糊（依封面取色，佔用最高）',
+      new: '新',
+      cost: { low: '低開銷', medium: '中開銷', high: '高開銷' },
     },
     closeAppOption: {
       text: '關閉主面板時...',
