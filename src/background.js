@@ -7,6 +7,7 @@ import {
   globalShortcut,
   nativeTheme,
   screen,
+  session,
 } from 'electron';
 import {
   isWindows,
@@ -28,6 +29,7 @@ import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer';
 import { EventEmitter } from 'events';
 import express from 'express';
 import expressProxy from 'express-http-proxy';
+import axios from 'axios';
 import Store from 'electron-store';
 import { createMpris, createDbus } from '@/electron/mpris';
 import { PRODUCT_NAME, RELEASES_URL } from '@/config/app';
@@ -152,6 +154,66 @@ class Background {
     log('creating express app');
 
     const expressApp = express();
+
+    // CDN 转发端点。
+    //
+    // 渲染进程已开启 webSecurity，无法再跨源 XHR 网易云 CDN（音频缓存与封面
+    // 预热都是 XHR，img/audio 标签不受影响）。这里做同源转发。
+    //
+    // 域名白名单是必须的：本服务监听在 localhost，若不校验目标就会变成
+    // 任意可达的开放代理。
+    const ALLOWED_PROXY_HOSTS = [
+      /\.music\.126\.net$/i, // 网易云音频与封面
+      /\.bilivideo\.com$/i, // UnblockNeteaseMusic 的 bilibili 音源
+    ];
+    expressApp.get('/proxy', async (req, res) => {
+      const target = req.query.url;
+      if (typeof target !== 'string') return res.status(400).end();
+
+      let parsed;
+      try {
+        parsed = new URL(target);
+      } catch {
+        return res.status(400).end();
+      }
+
+      const allowed =
+        parsed.protocol === 'https:' &&
+        ALLOWED_PROXY_HOSTS.some(re => re.test(parsed.hostname));
+      if (!allowed) {
+        log(`[proxy] 拒绝非白名单目标: ${parsed.hostname}`);
+        return res.status(403).end();
+      }
+
+      try {
+        const upstream = await axios.get(target, {
+          responseType: 'stream',
+          timeout: 30000,
+          // 透传 Range 以便后续按需分段读取
+          headers: req.headers.range ? { Range: req.headers.range } : {},
+          validateStatus: s => s >= 200 && s < 400,
+        });
+        res.status(upstream.status);
+        for (const h of [
+          'content-type',
+          'content-length',
+          'accept-ranges',
+          'content-range',
+          'cache-control',
+          'etag',
+          'last-modified',
+        ]) {
+          const v = upstream.headers[h];
+          if (v !== undefined) res.setHeader(h, v);
+        }
+        upstream.data.on('error', () => res.destroy());
+        upstream.data.pipe(res);
+      } catch (err) {
+        log(`[proxy] 转发失败: ${err.message}`);
+        if (!res.headersSent) res.status(502).end();
+      }
+    });
+
     // 渲染进程产物目录：`vite build --mode electron` 输出到 dist/，
     // 而本文件构建后位于 dist-electron/，因此渲染产物在 ../dist。
     expressApp.use('/', express.static(path.join(__dirname, '..', 'dist')));
@@ -190,10 +252,17 @@ class Background {
       title: PRODUCT_NAME,
       show: false,
       webPreferences: {
-        webSecurity: false,
-        nodeIntegration: true,
-        enableRemoteModule: true,
-        contextIsolation: false,
+        // 安全模型（M1b）：渲染进程不再拥有任何 Node 能力，
+        // 需要主进程能力时只能走 preload 暴露的白名单桥（见 src/preload.js）。
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        // 开启同源策略。渲染进程原先直连网易云 CDN 的 XHR（音频/封面缓存）
+        // 因此改为经本地 27232 的 /proxy 转发。
+        webSecurity: true,
+        // TODO(M1b 后续): 评估开启 sandbox。当前 preload 只用 contextBridge 与
+        // ipcRenderer，理论上可在沙箱内运行；先保持 false 以缩小本次改动面。
+        sandbox: false,
       },
       backgroundColor:
         ((appearance === undefined || appearance === 'auto') &&
@@ -262,6 +331,47 @@ class Background {
           : 'http://localhost:27232'
       );
     }
+  }
+
+  /**
+   * 设置内容安全策略（CSP）。
+   *
+   * Electron 会对没有 CSP 的页面给出安全警告；有了 CSP，即使出现注入类问题，
+   * 也无法加载外部脚本或把数据外发。
+   *
+   * 只在**非开发**模式设置：开发模式的页面由 Vite 提供，HMR 需要 websocket 与
+   * 更宽松的策略，强加 CSP 会打断开发体验。
+   */
+  applyContentSecurityPolicy() {
+    if (process.env.VITE_DEV_SERVER_URL) return;
+
+    const policy = [
+      "default-src 'self'",
+      // 封面等图片来自网易云 CDN；data:/blob: 供内联图与本地 blob 使用
+      "img-src 'self' data: blob: https:",
+      // 音频与 MV 来自 CDN、本地 blob（缓存音源）或 data:（bilibili 音源）
+      "media-src 'self' data: blob: https:",
+      // Vue 的 scoped 样式与大量内联 style 绑定需要 style 内联
+      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self'",
+      "font-src 'self' data:",
+      // 渲染进程只与本机的 API(同源 /api) 和 CDN 转发(同源 /proxy) 通信
+      "connect-src 'self'",
+      "worker-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ');
+
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [policy],
+        },
+      });
+    });
+    log('content security policy applied');
   }
 
   checkForUpdates() {
@@ -348,28 +458,33 @@ class Background {
       this.window.webContents.send('isMaximized', false);
     });
 
-    this.window.webContents.on('new-window', function (e, url) {
-      e.preventDefault();
+    // Electron 22 起移除了 'new-window' 事件，改用 setWindowOpenHandler。
+    // 语义与原实现一致：last.fm 的登录页开独立窗口，其余一律交给系统浏览器。
+    this.window.webContents.setWindowOpenHandler(({ url }) => {
       log('open url');
       const excludeHosts = ['www.last.fm'];
       const exclude = excludeHosts.find(host => url.includes(host));
       if (exclude) {
-        const newWindow = new BrowserWindow({
-          width: 800,
-          height: 600,
-          titleBarStyle: 'default',
-          title: PRODUCT_NAME,
-          webPreferences: {
-            webSecurity: false,
-            nodeIntegration: true,
-            enableRemoteModule: true,
-            contextIsolation: false,
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            width: 800,
+            height: 600,
+            titleBarStyle: 'default',
+            title: PRODUCT_NAME,
+            webPreferences: {
+              // 该窗口加载的是远端页面（last.fm 登录），
+              // 因此**不挂载**我们的 preload，也不给任何 Node 能力。
+              contextIsolation: true,
+              nodeIntegration: false,
+              webSecurity: true,
+              sandbox: true,
+            },
           },
-        });
-        newWindow.loadURL(url);
-        return;
+        };
       }
       shell.openExternal(url);
+      return { action: 'deny' };
     });
   }
 
@@ -415,6 +530,9 @@ class Background {
 
       // check for updates
       this.checkForUpdates();
+
+      // 内容安全策略
+      this.applyContentSecurityPolicy();
 
       // create menu
       createMenu(this.window, this.store);

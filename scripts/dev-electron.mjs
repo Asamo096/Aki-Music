@@ -33,8 +33,11 @@ await ctx.rebuild();
 await ctx.watch();
 
 // 3. 启动 Electron
+//    额外参数会透传给 Electron，例如：
+//      pnpm dev:electron -- --remote-debugging-port=9222
+const electronArgs = process.argv.slice(2).filter(a => a !== '--');
 const electronPath = (await import('electron')).default;
-const electron = spawn(electronPath, [root], {
+const electron = spawn(electronPath, [root, ...electronArgs], {
   stdio: 'inherit',
   env: {
     ...process.env,

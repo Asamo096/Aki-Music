@@ -12,6 +12,7 @@ import { PRODUCT_NAME } from '@/config/app';
 import { Howl, Howler } from 'howler';
 import shuffle from 'lodash/shuffle';
 import { decode as base642Buffer } from '@/utils/base64';
+import { ipcRenderer as electronIpcRenderer } from '@/utils/electronBridge';
 
 const PLAY_PAUSE_FADE_DURATION = 200;
 
@@ -26,10 +27,8 @@ const UNPLAYABLE_CONDITION = {
   PLAY_PREV_TRACK: 'playPrevTrack',
 };
 
-const electron =
-  process.env.IS_ELECTRON === true ? window.require('electron') : null;
 const ipcRenderer =
-  process.env.IS_ELECTRON === true ? electron.ipcRenderer : null;
+  process.env.IS_ELECTRON === true ? electronIpcRenderer : null;
 const delay = ms =>
   new Promise(resolve => {
     setTimeout(() => {

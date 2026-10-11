@@ -92,6 +92,17 @@ async function deleteExcessCache() {
   }
 }
 
+/**
+ * 把 CDN 资源改走本地 /proxy 同源转发。
+ *
+ * 渲染进程已开启 webSecurity，跨源 XHR 会被拦截；而下面的音频与封面预热
+ * 都是 XHR（img/audio 标签不受影响）。转发端点与域名白名单见 src/background.js。
+ *
+ * data: / blob: 这类本就同源的地址原样返回。
+ */
+const proxied = url =>
+  /^https?:/i.test(url) ? `/proxy?url=${encodeURIComponent(url)}` : url;
+
 export function cacheTrackSource(trackInfo, url, bitRate, from = 'netease') {
   if (!process.env.IS_ELECTRON) return;
   const name = trackInfo.name;
@@ -103,11 +114,11 @@ export function cacheTrackSource(trackInfo, url, bitRate, from = 'netease') {
   if (cover.slice(0, 5) !== 'https') {
     cover = 'https' + cover.slice(4);
   }
-  axios.get(`${cover}?param=512y512`);
-  axios.get(`${cover}?param=224y224`);
-  axios.get(`${cover}?param=1024y1024`);
+  axios.get(proxied(`${cover}?param=512y512`));
+  axios.get(proxied(`${cover}?param=224y224`));
+  axios.get(proxied(`${cover}?param=1024y1024`));
   return axios
-    .get(url, {
+    .get(proxied(url), {
       responseType: 'arraybuffer',
     })
     .then(response => {

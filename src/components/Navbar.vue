@@ -78,6 +78,7 @@
 import { mapState } from 'vuex';
 import { isLooseLoggedIn, doLogout } from '@/utils/auth';
 import { REPO_URL } from '@/config/app';
+import { isLinux, isWindows } from '@/utils/platform';
 
 // import icons for win32 title bar
 // icons by https://github.com/microsoft/vscode-codicons
@@ -122,12 +123,9 @@ export default {
     },
   },
   created() {
-    if (process.platform === 'win32') {
+    if (isWindows) {
       this.enableWin32Titlebar = true;
-    } else if (
-      process.platform === 'linux' &&
-      this.settings.linuxEnableCustomTitlebar
-    ) {
+    } else if (isLinux && this.settings.linuxEnableCustomTitlebar) {
       this.enableLinuxTitlebar = true;
     }
   },

@@ -22,8 +22,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
  */
 export function mainBuildOptions(watch = false) {
   return {
-    entryPoints: [path.join(root, 'src/background.js')],
-    outfile: path.join(root, 'dist-electron/background.js'),
+    // 两个入口：主进程与预加载脚本
+    entryPoints: [
+      { in: path.join(root, 'src/background.js'), out: 'background' },
+      { in: path.join(root, 'src/preload.js'), out: 'preload' },
+    ],
+    outdir: path.join(root, 'dist-electron'),
     bundle: true,
     platform: 'node',
     format: 'cjs',
@@ -51,6 +55,8 @@ if (invokedDirectly) {
     console.log('[build-main] watching…');
   } else {
     await build(mainBuildOptions(false));
-    console.log('[build-main] 主进程构建完成 → dist-electron/background.js');
+    console.log(
+      '[build-main] 主进程构建完成 → dist-electron/{background,preload}.js'
+    );
   }
 }

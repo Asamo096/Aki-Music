@@ -31,11 +31,10 @@
 import 'vscode-codicons/dist/codicon.css';
 
 import { mapState } from 'vuex';
+import { ipcRenderer as electronIpcRenderer } from '@/utils/electronBridge';
 
-const electron =
-  process.env.IS_ELECTRON === true ? window.require('electron') : null;
 const ipcRenderer =
-  process.env.IS_ELECTRON === true ? electron.ipcRenderer : null;
+  process.env.IS_ELECTRON === true ? electronIpcRenderer : null;
 
 export default {
   name: 'LinuxTitlebar',

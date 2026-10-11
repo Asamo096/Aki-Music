@@ -315,10 +315,10 @@ import Color from 'color';
 import { isAccountLoggedIn } from '@/utils/auth';
 import { hasListSource, getListSourcePath } from '@/utils/playList';
 import locale from '@/locale';
+import { ipcRenderer as electronIpcRenderer } from '@/utils/electronBridge';
 
-const electron =
-  process.env.IS_ELECTRON === true ? window.require('electron') : null;
-const ipcRenderer = electron?.ipcRenderer || null;
+const ipcRenderer =
+  process.env.IS_ELECTRON === true ? electronIpcRenderer : null;
 
 export default {
   name: 'Lyrics',

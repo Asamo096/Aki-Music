@@ -827,12 +827,17 @@ import {
 } from '@/utils/common';
 import { countDBSize, clearDB } from '@/utils/db';
 import { PRODUCT_NAME, REPO_URL } from '@/config/app';
+import { ipcRenderer as electronIpcRenderer } from '@/utils/electronBridge';
+// 平台判断来自主进程（见 utils/platform.js）。这里取别名是为了与本组件内
+// 同名的 computed（isMac/isLinux）区分开，避免阅读时误认为递归调用。
+import {
+  isLinux as isLinuxPlatform,
+  isMac as isMacPlatform,
+} from '@/utils/platform';
 import pkg from '../../package.json';
 
-const electron =
-  process.env.IS_ELECTRON === true ? window.require('electron') : null;
 const ipcRenderer =
-  process.env.IS_ELECTRON === true ? electron.ipcRenderer : null;
+  process.env.IS_ELECTRON === true ? electronIpcRenderer : null;
 
 const validShortcutCodes = ['=', '-', '~', '[', ']', ';', "'", ',', '.', '/'];
 
@@ -870,7 +875,7 @@ export default {
       return /macintosh|mac os x/i.test(navigator.userAgent);
     },
     isLinux() {
-      return process.platform === 'linux';
+      return isLinuxPlatform;
     },
     version() {
       return pkg.version;
@@ -1464,7 +1469,7 @@ export default {
       } else if (this.settings.lang === 'zh-TW') {
         shortcut = shortcut.replace('Space', '空白鍵');
       }
-      if (process.platform === 'darwin') {
+      if (isMacPlatform) {
         return shortcut
           .replace('CommandOrControl', '⌘')
           .replace('Command', '⌘')

@@ -1,6 +1,7 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { ipcRenderer } from '@/utils/electronBridge';
+
 export function getSendSettingsPlugin() {
-  const electron = window.require('electron');
-  const ipcRenderer = electron.ipcRenderer;
   return store => {
     store.subscribe((mutation, state) => {
       // console.log(mutation);

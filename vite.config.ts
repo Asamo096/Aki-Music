@@ -85,27 +85,38 @@ export default defineConfig(({ command, mode }) => {
       ),
       'process.env.VUE_APP_ELECTRON_API_URL_DEV': str(
         'VUE_APP_ELECTRON_API_URL_DEV',
-        'http://127.0.0.1:10754'
+        // 桌面开发默认走同源 /api，由下面的 dev server 代理转发到内嵌 API(10754)。
+        // 开启 webSecurity 后渲染进程不能再跨源直连 10754，直连地址会失败。
+        '/api'
       ),
       'process.env.VUE_APP_LASTFM_API_KEY': str('VUE_APP_LASTFM_API_KEY'),
       'process.env.VUE_APP_LASTFM_API_SHARED_SECRET': str(
         'VUE_APP_LASTFM_API_SHARED_SECRET'
       ),
       'process.env.VUE_APP_REAL_IP': str('VUE_APP_REAL_IP'),
-      // Web 构建没有 Node 的 process，而渲染进程用它判断平台（见 utils/platform.js）。
-      // 桌面端**必须保留**真实的 process，否则平台判断会失真。
-      ...(isElectron ? {} : { 'process.platform': JSON.stringify('') }),
+      // 说明：这里不再需要为 process.platform 做替换。平台判断已收敛到
+      // utils/platform.js，它从 preload 注入的 window.aki.platform 读取；
+      // Web 构建下取不到，视作未知平台（与上游 Web 端行为一致）。
     },
 
     server: {
       port: Number(env.DEV_SERVER_PORT) || 8080,
       host: true,
       proxy: {
-        // Web 开发时假设 API 服务独立运行在 3000 端口
+        // 桌面开发：渲染进程经开发服务器**同源**访问内嵌 API(10754)。
+        // Web 开发：假设 API 服务独立运行在 3000 端口。
         '^/api': {
-          target: 'http://localhost:3000',
+          target: isElectron
+            ? 'http://127.0.0.1:10754'
+            : 'http://localhost:3000',
           changeOrigin: true,
           rewrite: p => p.replace(/^\/api/, ''),
+        },
+        // CDN 转发端点：桌面构建的音频/封面缓存要经它访问网易云 CDN
+        // （webSecurity 已开启，渲染进程不能跨源）。实现见 src/background.js。
+        '^/proxy': {
+          target: 'http://127.0.0.1:27232',
+          changeOrigin: true,
         },
       },
     },
