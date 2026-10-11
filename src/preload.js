@@ -41,7 +41,7 @@ const SEND_CHANNELS = [
 ];
 
 /** 渲染进程 → 主进程，需要返回值 */
-const INVOKE_CHANNELS = ['unblock-music'];
+const INVOKE_CHANNELS = ['unblock-music', 'show-native-alert'];
 
 /** 主进程 → 渲染进程，事件订阅 */
 const RECEIVE_CHANNELS = [

@@ -347,10 +347,15 @@ class Background {
 
     const policy = [
       "default-src 'self'",
-      // 封面等图片来自网易云 CDN；data:/blob: 供内联图与本地 blob 使用
-      "img-src 'self' data: blob: https:",
-      // 音频与 MV 来自 CDN、本地 blob（缓存音源）或 data:（bilibili 音源）
-      "media-src 'self' data: blob: https:",
+      // 图片与音频必须允许 http：网易云 CDN 返回的就是 http:// 链接
+      // （封面、头像），且未登录时的音频外链会 302 到 http 的 CDN 地址。
+      // 页面本身由本地 http 服务提供，此处放开 http 不额外扩大风险；
+      // 真正关键的是 script-src 仍为 'self'。
+      "img-src 'self' data: blob: https: http:",
+      // 音频与 MV 来自 CDN、本地 blob（缓存音源）或 data:（bilibili 音源）。
+      // 解锁音源（UnblockNeteaseMusic）还会命中酷狗/QQ 等不同主机，
+      // 因此这里不做主机白名单。
+      "media-src 'self' data: blob: https: http:",
       // Vue 的 scoped 样式与大量内联 style 绑定需要 style 内联
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self'",

@@ -147,6 +147,15 @@ export function initIpcMain(win, store, trayEventEmitter) {
   // UNM.enableLogging(UNM.LoggingType.ConsoleEnv);
   const unmExecutor = new UNM.Executor();
 
+  // 原生对话框。上游由渲染进程直接 require('electron') 调 dialog.showMessageBoxSync，
+  // 沙箱化后改为经 preload 白名单桥调用（渲染进程见 src/utils/nativeAlert.js）。
+  ipcMain.handle('show-native-alert', (_, message) => {
+    dialog.showMessageBoxSync(null, {
+      type: 'warning',
+      message: String(message ?? ''),
+    });
+  });
+
   ipcMain.handle(
     'unblock-music',
     /**

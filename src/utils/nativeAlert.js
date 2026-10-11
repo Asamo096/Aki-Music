@@ -1,28 +1,24 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { ipcRenderer } from '@/utils/electronBridge';
+
 /**
- * Returns an alert-like function that fits current runtime environment
+ * 与运行时环境匹配的 alert 函数。
  *
- * This function is amid to solve a electron bug on Windows, that, when
- * user dismissed a browser alert, <input> elements cannot be focused
- * for further editing unless switching to another window and then back
+ * 存在理由：Electron 在 Windows 上有个 bug —— 用户关闭浏览器原生 alert 后，
+ * `<input>` 元素会失去焦点能力，除非切到别的窗口再切回来。
+ * @see https://github.com/electron/electron/issues/19977
  *
- * @returns { (message:string) => void }
- * Built-in alert function for browser environment
- * A function wrapping {@link dialog.showMessageBoxSync} for electron environment
+ * 上游此处直接 `require('electron')` 取 dialog（依赖 nodeIntegration）。
+ * 渲染进程沙箱化后没有 `require`，改为经 preload 的白名单桥调用主进程的
+ * `show-native-alert`（见 src/preload.js 与 src/electron/ipcMain.js）。
  *
- * @see {@link https://github.com/electron/electron/issues/19977} for upstream electron issue
+ * 行为差异：主进程的 showMessageBoxSync 会阻塞主进程，而这里是异步返回，
+ * 调用方在对话框关闭前就会继续执行。现有调用点均忽略返回值，影响可忽略。
  */
 const nativeAlert = (() => {
-  if (process.env.IS_ELECTRON === true) {
-    const { dialog } = require('electron');
-    if (dialog) {
-      return message => {
-        var options = {
-          type: 'warning',
-          message,
-        };
-        dialog.showMessageBoxSync(null, options);
-      };
-    }
+  if (process.env.IS_ELECTRON === true && ipcRenderer) {
+    return message =>
+      ipcRenderer.invoke('show-native-alert', String(message ?? ''));
   }
   return alert;
 })();
