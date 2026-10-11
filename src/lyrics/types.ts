@@ -9,6 +9,7 @@
  * 时间单位统一为**秒**（与项目既有约定一致：`utils/lyrics.js` 与播放器都用秒）。
  * 注意上游解析器（AMLL TTML、网易 yrc）给的是毫秒，适配器负责换算。
  */
+import type { LineRenderHints } from './timing/renderHints';
 
 /** 一个词/音节的时间区间 */
 export interface LyricWord {
@@ -39,6 +40,11 @@ export interface LyricLine {
   background?: boolean;
   /** 是否为对唱行（AMLL 标注，渲染层可据此右对齐） */
   duet?: boolean;
+  /**
+   * 渲染提示（由 timing/renderHints 计算）。纯派生数据，算一次即可复用，
+   * 因此挂在行上做缓存 —— 见 annotateLyricLines / ensureLyricDataRenderHints。
+   */
+  renderHints?: LineRenderHints;
 }
 
 /** 歌词格式 */

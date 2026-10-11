@@ -18,6 +18,8 @@ import type { LyricData, LyricSourceId } from './types';
 import { resolveTiers, type LyricTier } from './sources/resolve';
 import { loadAmllLyrics } from './sources/amll';
 import { loadNeteaseLrc, loadNeteaseYrc } from './sources/netease';
+import { ensureLyricDataRenderHints } from './timing/renderHints';
+import { hasSecondaryText, mergeSecondaryText } from './core/enrich';
 
 export type {
   LyricData,
@@ -29,6 +31,17 @@ export type {
 export { SOURCE_LABELS } from './types';
 export { detectFormat, parseLyricPayload } from './core/parse';
 export { resolveTiers, type LyricTier } from './sources/resolve';
+export { mergeSecondaryText, hasSecondaryText } from './core/enrich';
+// 渲染层共用工具（歌词页 / 桌面歌词 / 远程控制窗口走同一个入口）
+export { getLineText, getLineSecondaryText } from './utils/text';
+export { filterNeteaseLyricNoise } from './utils/neteaseFilter';
+export { findActiveLineIndex } from './timing/activeLine';
+export { getWordProgress, applyWordRevealMode } from './timing/wordProgress';
+export {
+  buildLineRenderHints,
+  getLineTransitionTiming,
+  type LineRenderHints,
+} from './timing/renderHints';
 
 export interface LoadLyricsOptions {
   /** 翻译的语言偏好（按优先级），例如 ['zh-cn', 'zh'] */
@@ -68,8 +81,35 @@ export async function loadLyrics(
   options: LoadLyricsOptions = {}
 ): Promise<LyricData | null> {
   const { onFallback } = options;
-  return resolveTiers(buildTiers(trackId, options), (tier, error) => {
+  const data = await resolveTiers(buildTiers(trackId, options), (tier, error) => {
     console.warn(`[lyrics] ${tier.id} 取词失败，降级到下一档`, error);
     onFallback?.(tier.id, error);
   });
+
+  // AMLL 那份逐字歌词常常不带翻译/罗马音，而网易云接口有 —— 补回来，
+  // 否则相比旧歌词页会"丢翻译"（详见 core/enrich.ts 的注释）。
+  const enriched = await enrichSecondaryText(data, trackId);
+
+  // 统一在这里补渲染节奏提示，消费方（歌词页/桌面歌词）不必自己记着调用；
+  // 已有且一致的 hints 会原样返回（见 renderHints.ts 的 migrate 逻辑）。
+  return ensureLyricDataRenderHints(enriched);
+}
+
+/** 只有"非网易云行级来源 + 缺副行文本"时才去补，避免重复请求已经用过的接口 */
+async function enrichSecondaryText(
+  data: LyricData | null,
+  trackId: string | number
+): Promise<LyricData | null> {
+  if (!data || data.source === 'netease-lrc' || hasSecondaryText(data)) {
+    return data;
+  }
+
+  try {
+    const lrc = await loadNeteaseLrc(trackId);
+    return mergeSecondaryText(data, lrc);
+  } catch (error) {
+    // 补翻译失败不影响主流程
+    console.warn('[lyrics] 补副行文本失败', error);
+    return data;
+  }
 }

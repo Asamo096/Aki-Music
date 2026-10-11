@@ -235,37 +235,15 @@
             class="lyrics-container"
             :style="lyricFontSize"
           >
-            <div id="line-1" class="line"></div>
-            <div
-              v-for="(line, index) in lyricToShow"
-              :id="`line${index}`"
-              :key="index"
-              class="line"
-              :class="{
-                highlight: highlightLyricIndex === index,
-              }"
-              @click="clickLyricLine(line.time)"
-              @dblclick="clickLyricLine(line.time, true)"
-            >
-              <div class="content">
-                <span
-                  v-if="line.contents[0]"
-                  @click.right="openLyricMenu($event, line, 0)"
-                  >{{ line.contents[0] }}</span
-                >
-                <br />
-                <span
-                  v-if="
-                    line.contents[1] &&
-                    $store.state.settings.showLyricsTranslation
-                  "
-                  class="translation"
-                  @click.right="openLyricMenu($event, line, 1)"
-                  >{{ line.contents[1] }}</span
-                >
-              </div>
-            </div>
-            <div id="line-end" class="line"></div>
+            <LyricLines
+              :lines="lines"
+              :active-index="highlightLyricIndex"
+              :has-word-timing="hasWordTiming"
+              :secondary="secondaryLyric"
+              :auto-scroll="showLyrics"
+              @seek="clickLyricLine"
+              @menu="openLyricMenu"
+            />
             <ContextMenu v-if="!noLyric" ref="lyricMenu">
               <div class="item" @click="copyLyric(false)">{{
                 $t('contextMenu.copyLyric')
@@ -273,7 +251,7 @@
               <div
                 v-if="
                   rightClickLyric &&
-                  rightClickLyric.contents[1] &&
+                  hasSecondaryForMenu &&
                   $store.state.settings.showLyricsTranslation
                 "
                 class="item"
@@ -306,9 +284,18 @@
 import { mapState, mapMutations, mapActions } from 'vuex';
 import VueSlider from 'vue-slider-component';
 import ContextMenu from '@/components/ContextMenu.vue';
+import LyricLines from '@/components/LyricLines.vue';
 import { formatTrackTime } from '@/utils/common';
-import { getLyric, getCloudLyric } from '@/api/track';
-import { lyricParser, copyLyric, parseLyric } from '@/utils/lyrics';
+import { getCloudLyric } from '@/api/track';
+import { copyLyric } from '@/utils/lyrics';
+import {
+  loadLyrics,
+  parseLyricPayload,
+  filterNeteaseLyricNoise,
+  findActiveLineIndex,
+  getLineText,
+  getLineSecondaryText,
+} from '@/lyrics';
 import ButtonIcon from '@/components/ButtonIcon.vue';
 import * as Vibrant from 'node-vibrant/dist/vibrant.worker.min.js';
 import Color from 'color';
@@ -326,13 +313,15 @@ export default {
     VueSlider,
     ButtonIcon,
     ContextMenu,
+    LyricLines,
   },
   data() {
     return {
       lyricsInterval: null,
-      lyric: [],
-      tlyric: [],
-      romalyric: [],
+      /** 引擎产出的歌词（null = 无歌词） */
+      lyricData: null,
+      /** 是否纯音乐（点击行不跳转，与旧行为一致） */
+      instrumental: false,
       lyricType: 'translation', // or 'romaPronunciation'
       highlightLyricIndex: -1,
       minimize: true,
@@ -361,75 +350,40 @@ export default {
     bgImageUrl() {
       return this.player.currentTrack?.al?.picUrl + '?param=512y512';
     },
+    /** 引擎产出的歌词行（统一数据契约，见 src/lyrics/types.ts） */
+    lines() {
+      return this.lyricData?.lines ?? [];
+    },
+    /** 是否有逐字时间轴（行级歌词不做逐字扫过） */
+    hasWordTiming() {
+      return this.lyricData?.hasWordTiming === true;
+    },
+    hasTranslation() {
+      return this.lines.some(line => Boolean(line.translation));
+    },
+    hasRoman() {
+      return this.lines.some(line => Boolean(line.roman));
+    },
     isShowLyricTypeSwitch() {
-      return this.romalyric.length > 0 && this.tlyric.length > 0;
+      return this.hasTranslation && this.hasRoman;
     },
-    lyricToShow() {
+    /** 副行显示什么：跟设置与切换按钮走；关掉翻译显示时副行整体不显示 */
+    secondaryLyric() {
+      if (!this.settings.showLyricsTranslation) return 'none';
       return this.lyricType === 'translation'
-        ? this.lyricWithTranslation
-        : this.lyricWithRomaPronunciation;
+        ? 'translation'
+        : 'romaPronunciation';
     },
-    lyricWithTranslation() {
-      let ret = [];
-      // 空内容的去除
-      const lyricFiltered = this.lyric.filter(({ content }) =>
-        Boolean(content)
+    /** 右键的那一行是否有副行文本（决定"复制歌词与翻译"菜单项是否出现） */
+    hasSecondaryForMenu() {
+      const line = this.rightClickLyric
+        ? this.lines[this.rightClickLyric.index]
+        : null;
+      if (!line) return false;
+      return Boolean(
+        getLineSecondaryText(line, 'translation') ||
+          getLineSecondaryText(line, 'romaPronunciation')
       );
-      // content统一转换数组形式
-      if (lyricFiltered.length) {
-        lyricFiltered.forEach(l => {
-          const { rawTime, time, content } = l;
-          const lyricItem = { time, content, contents: [content] };
-          const sameTimeTLyric = this.tlyric.find(
-            ({ rawTime: tLyricRawTime }) => tLyricRawTime === rawTime
-          );
-          if (sameTimeTLyric) {
-            const { content: tLyricContent } = sameTimeTLyric;
-            if (content) {
-              lyricItem.contents.push(tLyricContent);
-            }
-          }
-          ret.push(lyricItem);
-        });
-      } else {
-        ret = lyricFiltered.map(({ time, content }) => ({
-          time,
-          content,
-          contents: [content],
-        }));
-      }
-      return ret;
-    },
-    lyricWithRomaPronunciation() {
-      let ret = [];
-      // 空内容的去除
-      const lyricFiltered = this.lyric.filter(({ content }) =>
-        Boolean(content)
-      );
-      // content统一转换数组形式
-      if (lyricFiltered.length) {
-        lyricFiltered.forEach(l => {
-          const { rawTime, time, content } = l;
-          const lyricItem = { time, content, contents: [content] };
-          const sameTimeRomaLyric = this.romalyric.find(
-            ({ rawTime: tLyricRawTime }) => tLyricRawTime === rawTime
-          );
-          if (sameTimeRomaLyric) {
-            const { content: romaLyricContent } = sameTimeRomaLyric;
-            if (content) {
-              lyricItem.contents.push(romaLyricContent);
-            }
-          }
-          ret.push(lyricItem);
-        });
-      } else {
-        ret = lyricFiltered.map(({ time, content }) => ({
-          time,
-          content,
-          contents: [content],
-        }));
-      }
-      return ret;
     },
     lyricFontSize() {
       return {
@@ -437,7 +391,7 @@ export default {
       };
     },
     noLyric() {
-      return this.lyric.length == 0;
+      return this.lines.length === 0;
     },
     artist() {
       return this.currentTrack?.ar
@@ -565,68 +519,49 @@ export default {
         this.player.playNextTrack();
       }
     },
-    getLyric() {
+    /**
+     * 取歌词：走三级引擎（AMLL TTML → 网易云逐字 → 网易云行级）。
+     * 云盘未关联歌曲走老接口取内置歌词，再归一成同一份 LyricData。
+     */
+    async getLyric() {
       if (!this.currentTrack.id) return;
-      if (
+      const isCloudTrack =
         this.currentTrack.pc !== null &&
         this.currentTrack.cd === null &&
-        this.$store.state.data.user?.userId
-      ) {
+        this.$store.state.data.user?.userId;
+
+      let data = null;
+      if (isCloudTrack) {
         //云盘未设置关联的歌曲获取其内置歌词
-        return getCloudLyric(
+        const cloud = await getCloudLyric(
           this.currentTrack.id,
           this.$store.state.data.user?.userId
-        ).then(data => {
-          this.tlyric = [];
-          this.romalyric = [];
-          this.lyric = data?.lrc?.length > 0 ? parseLyric(data.lrc) : [];
-          this.lyricType = 'translation';
-          return true;
+        );
+        data =
+          cloud?.lrc?.length > 0
+            ? parseLyricPayload(cloud.lrc, { format: 'lrc' })
+            : null;
+      } else {
+        data = await loadLyrics(this.currentTrack.id, {
+          preferredLangs: this.$i18n?.locale ? [this.$i18n.locale] : [],
         });
       }
-      return getLyric(this.currentTrack.id).then(data => {
-        if (!data?.lrc?.lyric) {
-          this.lyric = [];
-          this.tlyric = [];
-          this.romalyric = [];
-          return false;
-        } else {
-          let { lyric, tlyric, romalyric } = lyricParser(data);
-          lyric = lyric.filter(
-            l => !/^作(词|曲)\s*(:|：)\s*无$/.exec(l.content)
-          );
-          let includeAM =
-            lyric.length <= 10 &&
-            lyric.map(l => l.content).includes('纯音乐，请欣赏');
-          if (includeAM) {
-            let reg = /^作(词|曲)\s*(:|：)\s*/;
-            let author = this.currentTrack?.ar[0]?.name;
-            lyric = lyric.filter(l => {
-              let regExpArr = l.content.match(reg);
-              return (
-                !regExpArr || l.content.replace(regExpArr[0], '') !== author
-              );
-            });
-          }
-          if (lyric.length === 1 && includeAM) {
-            this.lyric = [];
-            this.tlyric = [];
-            this.romalyric = [];
-            return false;
-          } else {
-            this.lyric = lyric;
-            this.tlyric = tlyric;
-            this.romalyric = romalyric;
-            if (tlyric.length * romalyric.length > 0) {
-              this.lyricType = 'translation';
-            } else {
-              this.lyricType =
-                lyric.length > 0 ? 'translation' : 'romaPronunciation';
-            }
-            return true;
-          }
-        }
-      });
+
+      const filtered = filterNeteaseLyricNoise(
+        data?.lines ?? [],
+        this.currentTrack?.ar?.[0]?.name
+      );
+      this.instrumental = filtered.instrumental;
+      this.lyricData = filtered.lines.length
+        ? { ...data, lines: filtered.lines }
+        : null;
+      this.highlightLyricIndex = -1;
+
+      if (this.hasTranslation && !this.hasRoman) {
+        this.lyricType = 'translation';
+      } else if (!this.hasTranslation && this.hasRoman) {
+        this.lyricType = 'romaPronunciation';
+      }
     },
     switchLyricType() {
       this.lyricType =
@@ -637,65 +572,48 @@ export default {
     },
     clickLyricLine(value, startPlay = false) {
       // TODO: 双击选择还会选中文字，考虑搞个右键菜单复制歌词
-      let jumpFlag = false;
-      this.lyric.filter(function (item) {
-        if (item.content == '纯音乐，请欣赏') {
-          jumpFlag = true;
-        }
-      });
-      if (window.getSelection().toString().length === 0 && !jumpFlag) {
+      if (window.getSelection().toString().length === 0 && !this.instrumental) {
         this.player.seek(value);
       }
       if (startPlay === true) {
         this.player.play();
       }
     },
-    openLyricMenu(e, lyric, idx) {
-      this.rightClickLyric = { ...lyric, idx };
+    /** 右键某一行：index 是行下标，which 是点中的那一段（原文/副行） */
+    openLyricMenu(e, index, which) {
+      this.rightClickLyric = { index, which };
       this.$refs.lyricMenu.openMenu(e);
       e.preventDefault();
     },
     copyLyric(withTranslation) {
-      if (this.rightClickLyric) {
-        const idx = this.rightClickLyric.idx;
-        if (!withTranslation) {
-          copyLyric(this.rightClickLyric.contents[idx]);
-        } else {
-          copyLyric(this.rightClickLyric.contents.join(' '));
-        }
+      if (!this.rightClickLyric) return;
+      const { index, which } = this.rightClickLyric;
+      const line = this.lines[index];
+      if (!line) return;
+      const primary = getLineText(line);
+      const secondary = getLineSecondaryText(line, this.lyricType);
+      if (!withTranslation) {
+        copyLyric(which === 'secondary' ? secondary : primary);
+      } else {
+        copyLyric([primary, secondary].filter(Boolean).join(' '));
       }
     },
     setLyricsInterval() {
       this.lyricsInterval = setInterval(() => {
         const progress = this.player.seek(null, false) ?? 0;
-        let oldHighlightLyricIndex = this.highlightLyricIndex;
-        this.highlightLyricIndex = this.lyric.findIndex((l, index) => {
-          const nextLyric = this.lyric[index + 1];
-          return (
-            progress >= l.time && (nextLyric ? progress < nextLyric.time : true)
-          );
-        });
-        if (oldHighlightLyricIndex !== this.highlightLyricIndex) {
-          // 只在显示歌词页面时才滚动
-          if (this.showLyrics) {
-            const el = document.getElementById(
-              `line${this.highlightLyricIndex}`
-            );
-            if (el)
-              el.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center',
-              });
-          }
+        const index = findActiveLineIndex(this.lines, progress);
+        if (index === this.highlightLyricIndex) return;
 
-          // 发送当前歌词到主进程（用于 Touch Bar 显示）
-          if (ipcRenderer && this.highlightLyricIndex >= 0) {
-            const currentLyricLine = this.lyricToShow[this.highlightLyricIndex];
-            if (currentLyricLine && currentLyricLine.contents) {
-              // 只发送第一行歌词（原文），避免显示过长
-              const lyricText = currentLyricLine.contents[0] || '';
-              ipcRenderer.send('updateLyric', { lyric: lyricText });
-            }
+        this.highlightLyricIndex = index;
+
+        // 发送当前歌词到主进程（用于 Touch Bar 显示）
+        if (ipcRenderer && index >= 0) {
+          const currentLyricLine = this.lines[index];
+          if (currentLyricLine) {
+            // 只发送第一行歌词（原文），避免显示过长
+            ipcRenderer.send('updateLyric', {
+              lyric: getLineText(currentLyricLine),
+            });
           }
         }
       }, 50);
@@ -1009,74 +927,12 @@ export default {
     transition: 0.5s;
     scrollbar-width: none; // firefox
 
-    .line {
-      margin: 2px 0;
-      padding: 12px 18px;
-      transition: 0.5s;
-      border-radius: 12px;
-
-      &:hover {
-        background: var(--color-secondary-bg-for-transparent);
-      }
-
-      .content {
-        transform-origin: center left;
-        transform: scale(0.95);
-        transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        user-select: none;
-
-        span {
-          opacity: 0.28;
-          cursor: default;
-          font-size: 1em;
-          transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        span.translation {
-          opacity: 0.2;
-          font-size: 0.925em;
-        }
-      }
-    }
-
-    .line#line-1:hover,
-    .line#line-end:hover {
-      background: unset;
-    }
-
-    // 底部留白，让最后几句歌词也能滚动到屏幕中间。
-    // 不能用 .line:last-child，因为最后一个子元素是右键菜单 (ContextMenu)
-    .line#line-end {
-      flex-shrink: 0;
-      height: 50vh;
-      margin: 0;
-      padding: 0;
-    }
-
-    .translation {
-      margin-top: 0.1em;
-    }
-
-    .highlight div.content {
-      transform: scale(1);
-
-      span {
-        opacity: 0.98;
-        display: inline-block;
-      }
-
-      span.translation {
-        opacity: 0.65;
-      }
-    }
+    // 行本身（.line / .content / .translation / 上下留白）由 LyricLines 组件渲染，
+    // 样式在组件内（scoped），这里只保留滚动容器。
   }
 
   ::-webkit-scrollbar {
     display: none;
-  }
-
-  .lyrics-container .line:first-child {
-    margin-top: 50vh;
   }
 }
 
