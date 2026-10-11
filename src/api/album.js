@@ -57,7 +57,8 @@ export function albumDynamicDetail(id) {
   return request({
     url: '/album/detail/dynamic',
     method: 'get',
-    params: { id, timestamp: new Date().getTime() },
+    // 只读接口不注入时间戳：同上
+    params: { id },
   });
 }
 

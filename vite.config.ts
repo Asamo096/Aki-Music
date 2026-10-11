@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { defineConfig, loadEnv } from 'vite';
+// defineConfig 取自 vitest/config：它是 vite 的超集，额外支持下面的 `test` 段，
+// 这样单测与应用构建共用同一份配置（resolve.alias 等），不必维护第二份。
+// 注意 loadEnv 只从 vite 导出，vitest/config 没有转发它。
+import { loadEnv } from 'vite';
+import { defineConfig } from 'vitest/config';
 import vue2 from '@vitejs/plugin-vue2';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
@@ -128,6 +132,15 @@ export default defineConfig(({ command, mode }) => {
       // 与上游一致：产物体积优先，Electron 内不需要为老浏览器降级
       target: 'esnext',
       chunkSizeWarningLimit: 1500,
+    },
+
+    // 单测（`pnpm test`）。
+    // 覆盖面刻意保守：只测不依赖浏览器/DOM 的核心逻辑——歌词解析、请求去重、
+    // 可播放性判断。播放器、路由、组件等留给后续的 Playwright 冒烟。
+    test: {
+      environment: 'node',
+      include: ['test/unit/**/*.spec.js'],
+      globals: false,
     },
   };
 });

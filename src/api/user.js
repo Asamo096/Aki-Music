@@ -11,8 +11,8 @@ export function userDetail(uid) {
     url: '/user/detail',
     method: 'get',
     params: {
+      // 只读接口不注入时间戳：否则服务端 2 分钟响应缓存与本地请求去重都会失效
       uid,
-      timestamp: new Date().getTime(),
     },
   });
 }
@@ -199,7 +199,7 @@ export function cloudDiskTrackDetail(id) {
     url: '/user/cloud/detail',
     method: 'get',
     params: {
-      timestamp: new Date().getTime(),
+      // 只读接口不注入时间戳：同上
       id,
     },
   });

@@ -19,6 +19,8 @@
     "electron:build": "pnpm build:electron && electron-builder --config electron-builder.yml",
     "electron:build:dir": "pnpm build:electron && electron-builder --config electron-builder.yml --dir",
     "electron:build:win": "pnpm build:electron && electron-builder --config electron-builder.yml --win",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint --ext .js,.vue src",
     "prettier": "prettier --write ./src",
@@ -82,7 +84,8 @@
     "sharp": "^0.35.5",
     "typescript": "^5.9.3",
     "vite": "^7.3.7",
-    "vite-plugin-pwa": "^2.0.0"
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.0.3"
   },
   "eslintConfig": {
     "root": true,

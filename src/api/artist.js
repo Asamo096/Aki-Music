@@ -13,8 +13,8 @@ export function getArtist(id) {
     url: '/artists',
     method: 'get',
     params: {
+      // 只读接口不注入时间戳：否则服务端 2 分钟响应缓存与本地请求去重都会失效
       id,
-      timestamp: new Date().getTime(),
     },
   }).then(async data => {
     if (!isAccountLoggedIn()) {

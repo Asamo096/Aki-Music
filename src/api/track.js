@@ -1,12 +1,22 @@
 import store from '@/store';
 import request from '@/utils/request';
 import { mapTrackPlayableStatus } from '@/utils/common';
+import { dedupe, requestKey } from '@/utils/requestCache';
 import {
   cacheTrackDetail,
   getTrackDetailFromCache,
   cacheLyric,
   getLyricFromCache,
 } from '@/utils/db';
+
+/**
+ * 缓存被视为「足够新鲜」的时长。
+ *
+ * 命中缓存且未超过此时长时，不再触发后台刷新——避免同一份数据在短时间内被
+ * 反复拉取（列表重渲染、预取、切歌路径都会命中同一份数据）。超过后才做一次
+ * **去重**的后台刷新，兼顾新鲜度与请求量。
+ */
+const REVALIDATE_AFTER_MS = 60 * 1000;
 
 /**
  * 获取音乐 url
@@ -37,34 +47,39 @@ export function getMP3(id) {
  * @param {string} ids - 音乐 id, 例如 ids=405998841,33894312
  */
 export function getTrackDetail(ids) {
-  const fetchLatest = () => {
-    return request({
-      url: '/song/detail',
-      method: 'get',
-      params: {
-        ids,
-      },
-    }).then(data => {
-      data.songs.map(song => {
-        const privileges = data.privileges.find(t => t.id === song.id);
-        cacheTrackDetail(song, privileges);
-      });
-      data.songs = mapTrackPlayableStatus(data.songs, data.privileges);
-      return data;
-    });
-  };
-  fetchLatest();
+  const idsInArray = typeof ids === 'string' ? ids.split(',') : [String(ids)];
+  // 键做归一化：同一批 id 顺序不同也视为同一次请求
+  const key = requestKey('song/detail', { ids: idsInArray });
 
-  let idsInArray = [String(ids)];
-  if (typeof ids === 'string') {
-    idsInArray = ids.split(',');
-  }
+  const fetchLatest = () =>
+    dedupe(key, () =>
+      request({
+        url: '/song/detail',
+        method: 'get',
+        params: {
+          ids,
+        },
+      }).then(data => {
+        data.songs.map(song => {
+          const privileges = data.privileges.find(t => t.id === song.id);
+          cacheTrackDetail(song, privileges);
+        });
+        data.songs = mapTrackPlayableStatus(data.songs, data.privileges);
+        return data;
+      })
+    );
 
   return getTrackDetailFromCache(idsInArray).then(result => {
-    if (result) {
-      result.songs = mapTrackPlayableStatus(result.songs, result.privileges);
+    if (!result) {
+      // 未命中：只发一次（上游此处会先无条件发一次，未命中时再发第二次）
+      return fetchLatest();
     }
-    return result ?? fetchLatest();
+    result.songs = mapTrackPlayableStatus(result.songs, result.privileges);
+    // 命中：立即返回；仅在缓存偏旧时去重地刷新一次，不阻塞调用方
+    if (Date.now() - (result.lastUpdated ?? 0) > REVALIDATE_AFTER_MS) {
+      fetchLatest().catch(() => {});
+    }
+    return result;
   });
 }
 
@@ -74,23 +89,31 @@ export function getTrackDetail(ids) {
  * @param {number} id - 音乐 id
  */
 export function getLyric(id) {
-  const fetchLatest = () => {
-    return request({
-      url: '/lyric',
-      method: 'get',
-      params: {
-        id,
-      },
-    }).then(result => {
-      cacheLyric(id, result);
-      return result;
-    });
-  };
+  const key = requestKey('lyric', { id });
 
-  fetchLatest();
+  const fetchLatest = () =>
+    dedupe(key, () =>
+      request({
+        url: '/lyric',
+        method: 'get',
+        params: {
+          id,
+        },
+      }).then(result => {
+        cacheLyric(id, result);
+        return result;
+      })
+    );
 
-  return getLyricFromCache(id).then(result => {
-    return result ?? fetchLatest();
+  return getLyricFromCache(id).then(record => {
+    if (!record) {
+      // 未命中：只发一次
+      return fetchLatest();
+    }
+    if (Date.now() - (record.updateTime ?? 0) > REVALIDATE_AFTER_MS) {
+      fetchLatest().catch(() => {});
+    }
+    return record.lyrics;
   });
 }
 
@@ -100,30 +123,37 @@ export function getLyric(id) {
  * @param {number} userId - 用户 id
  */
 export function getCloudLyric(songId, userId) {
-  const fetchLatest = () => {
-    return request({
-      url: '/api',
-      method: 'get',
-      params: {
-        uri: `/api/cloud/lyric/get`,
-        data: {
-          songId,
-          userId,
-          lv: '-1',
-          kv: '-1',
+  const key = requestKey('cloud/lyric', { songId, userId });
+
+  const fetchLatest = () =>
+    dedupe(key, () =>
+      request({
+        url: '/api',
+        method: 'get',
+        params: {
+          uri: `/api/cloud/lyric/get`,
+          data: {
+            songId,
+            userId,
+            lv: '-1',
+            kv: '-1',
+          },
+          crypto: 'eapi',
         },
-        crypto: 'eapi',
-      },
-    }).then(result => {
-      cacheLyric(songId, result);
-      return result;
-    });
-  };
+      }).then(result => {
+        cacheLyric(songId, result);
+        return result;
+      })
+    );
 
-  fetchLatest();
-
-  return getLyricFromCache(songId).then(result => {
-    return result ?? fetchLatest();
+  return getLyricFromCache(songId).then(record => {
+    if (!record) {
+      return fetchLatest();
+    }
+    if (Date.now() - (record.updateTime ?? 0) > REVALIDATE_AFTER_MS) {
+      fetchLatest().catch(() => {});
+    }
+    return record.lyrics;
   });
 }
 

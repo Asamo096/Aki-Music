@@ -12,8 +12,8 @@ export function mvDetail(mvid) {
     url: '/mv/detail',
     method: 'get',
     params: {
+      // 只读接口不注入时间戳：同上
       mvid,
-      timestamp: new Date().getTime(),
     },
   });
 }

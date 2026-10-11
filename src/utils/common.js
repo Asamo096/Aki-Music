@@ -95,23 +95,23 @@ export function isTrackPlayable(track) {
   if (isAccountLoggedIn() && track?.privilege?.cs) {
     return result;
   }
-  if (track.fee === 1 || track.privilege?.fee === 1) {
+  if (track?.fee === 1 || track?.privilege?.fee === 1) {
     if (isAccountLoggedIn() && store.state.data.user.vipType === 11) {
       result.playable = true;
     } else {
       result.playable = false;
       result.reason = 'VIP Only';
     }
-  } else if (track.fee === 4 || track.privilege?.fee === 4) {
+  } else if (track?.fee === 4 || track?.privilege?.fee === 4) {
     result.playable = false;
     result.reason = '付费专辑';
   } else if (
-    track.noCopyrightRcmd !== null &&
-    track.noCopyrightRcmd !== undefined
+    track?.noCopyrightRcmd !== null &&
+    track?.noCopyrightRcmd !== undefined
   ) {
     result.playable = false;
     result.reason = '无版权';
-  } else if (track.privilege?.st < 0 && isAccountLoggedIn()) {
+  } else if (track?.privilege?.st < 0 && isAccountLoggedIn()) {
     result.playable = false;
     result.reason = '已下架';
   }

@@ -173,6 +173,11 @@ export function getTrackDetailFromCache(ids) {
       if (result.songs.includes(undefined)) {
         return undefined;
       }
+      // 附带最新鲜度（取命中条目中最旧的一次写入时间），
+      // 供调用方判断是否需要后台刷新，见 api/track.js
+      result.lastUpdated = tracks.length
+        ? Math.min(...tracks.map(t => t.updateTime ?? 0))
+        : 0;
       return result;
     });
 }
@@ -185,10 +190,18 @@ export function cacheLyric(id, lyrics) {
   });
 }
 
+/**
+ * 读取缓存的歌词。
+ *
+ * 返回**整条记录**（含 updateTime）而不是仅 lyrics：调用方需要用它判断
+ * 缓存是否足够新鲜（见 api/track.js），避免每次调用都触发后台刷新。
+ *
+ * @returns {Promise<{lyrics: any, updateTime: number} | undefined>}
+ */
 export function getLyricFromCache(id) {
   return db.lyric.get(Number(id)).then(result => {
     if (!result) return undefined;
-    return result.lyrics;
+    return result;
   });
 }
 
