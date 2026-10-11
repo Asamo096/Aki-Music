@@ -5,6 +5,7 @@ import cloneDeep from 'lodash/cloneDeep';
 import shortcuts from '@/utils/shortcuts';
 import { createMenu } from './menu';
 import { isCreateTray, isMac } from '@/utils/platform';
+import { DISCORD_APP_ID, PRODUCT_NAME } from '@/config/app';
 
 const clc = require('cli-color');
 const log = text => {
@@ -71,7 +72,12 @@ const exitAskWithoutMac = (e, win) => {
     });
 };
 
-const client = require('discord-rich-presence')('818936529484906596');
+// Discord Rich Presence 需要属于本项目自己的 Discord 应用 ID；
+// 未配置时整条链路停用，避免在 Discord 上显示为上游产品。
+// TODO(M5 发布前): 注册 Aki Music 的 Discord 应用并填入 DISCORD_APP_ID。
+const client = DISCORD_APP_ID
+  ? require('discord-rich-presence')(DISCORD_APP_ID)
+  : null;
 
 /**
  * Make data a Buffer.
@@ -236,6 +242,7 @@ export function initIpcMain(win, store, trayEventEmitter) {
   });
 
   ipcMain.on('playDiscordPresence', (event, track) => {
+    if (!client) return;
     client.updatePresence({
       details: track.name + ' - ' + track.ar.map(ar => ar.name).join(','),
       state: track.al.name,
@@ -249,11 +256,12 @@ export function initIpcMain(win, store, trayEventEmitter) {
   });
 
   ipcMain.on('pauseDiscordPresence', (event, track) => {
+    if (!client) return;
     client.updatePresence({
       details: track.name + ' - ' + track.ar.map(ar => ar.name).join(','),
       state: track.al.name,
       largeImageKey: track.al.picUrl,
-      largeImageText: 'YesPlayMusic',
+      largeImageText: PRODUCT_NAME,
       smallImageKey: 'pause',
       smallImageText: 'Pause',
       instance: true,

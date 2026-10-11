@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 224 64" width="224" height="64" role="img" aria-label="Aki Music">
+  <!--
+    Aki Music 占位字标（placeholder wordmark）。
+    TODO(M5 品牌全套): 由正式设计稿替换本文件。
+    颜色刻意选用在浅色与深色主题下都能保持对比度的蓝色。
+  -->
+  <defs>
+    <linearGradient id="akiMark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6f9bff" />
+      <stop offset="1" stop-color="#335eea" />
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="8" width="48" height="48" rx="14" fill="url(#akiMark)" />
+  <path d="M19.5 19.8 L34.5 32 L19.5 44.2 Z" fill="#ffffff" />
+
+  <text
+    x="60"
+    y="36"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    font-size="23"
+    font-weight="600"
+    fill="#3f6fe4"
+  >Aki Music</text>
+  <text
+    x="60"
+    y="52"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+    font-size="11"
+    letter-spacing="1.4"
+    fill="#8a94a6"
+  >MUSIC PLAYER</text>
+</svg>

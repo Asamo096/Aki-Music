@@ -3,7 +3,9 @@ import Dexie from 'dexie';
 import store from '@/store';
 // import pkg from "../../package.json";
 
-const db = new Dexie('yesplaymusic');
+// IndexedDB 库名。上游名为 'yesplaymusic'；本项目没有存量用户，
+// 直接在开源前改名，避免把上游产品名带进用户数据路径。
+const db = new Dexie('akimusic');
 
 db.version(4).stores({
   trackDetail: '&id, updateTime',

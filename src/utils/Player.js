@@ -8,6 +8,7 @@ import store from '@/store';
 import { isAccountLoggedIn } from '@/utils/auth';
 import { cacheTrackSource, getTrackSource } from '@/utils/db';
 import { isCreateMpris, isCreateTray } from '@/utils/platform';
+import { PRODUCT_NAME } from '@/config/app';
 import { Howl, Howler } from 'howler';
 import shuffle from 'lodash/shuffle';
 import { decode as base642Buffer } from '@/utils/base64';
@@ -43,8 +44,8 @@ const excludeSaveKeys = [
 
 function setTitle(track) {
   document.title = track
-    ? `${track.name} · ${track.ar[0].name} - YesPlayMusic`
-    : 'YesPlayMusic';
+    ? `${track.name} · ${track.ar[0].name} - ${PRODUCT_NAME}`
+    : PRODUCT_NAME;
   if (isCreateTray) {
     ipcRenderer?.send('updateTrayTooltip', document.title);
   }

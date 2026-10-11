@@ -32,6 +32,7 @@ import express from 'express';
 import expressProxy from 'express-http-proxy';
 import Store from 'electron-store';
 import { createMpris, createDbus } from '@/electron/mpris';
+import { PRODUCT_NAME, RELEASES_URL } from '@/config/app';
 import { spawn } from 'child_process';
 const clc = require('cli-color');
 const log = text => {
@@ -186,7 +187,7 @@ class Background {
         isWindows ||
         (isLinux && this.store.get('settings.linuxEnableCustomTitlebar'))
       ),
-      title: 'YesPlayMusic',
+      title: PRODUCT_NAME,
       show: false,
       webPreferences: {
         webSecurity: false,
@@ -266,6 +267,15 @@ class Background {
 
   checkForUpdates() {
     if (isDevelopment) return;
+
+    // 自动更新依赖打包时写入的发布源配置。在 M5 配置本项目自己的发布源之前，
+    // 这里保持停用：既没有可用的更新 feed，上游的发布页也不属于本项目。
+    // TODO(M5 发布前): 配置 electron-builder 的 publish 源后恢复此项。
+    if (!RELEASES_URL) {
+      log('skip checkForUpdates: RELEASES_URL not configured');
+      return;
+    }
+
     log('checkForUpdates');
     autoUpdater.checkForUpdatesAndNotify();
 
@@ -281,9 +291,7 @@ class Background {
         })
         .then(result => {
           if (result.response === 0) {
-            shell.openExternal(
-              'https://github.com/qier222/YesPlayMusic/releases'
-            );
+            shell.openExternal(RELEASES_URL);
           }
         });
     };
@@ -351,7 +359,7 @@ class Background {
           width: 800,
           height: 600,
           titleBarStyle: 'default',
-          title: 'YesPlayMusic',
+          title: PRODUCT_NAME,
           webPreferences: {
             webSecurity: false,
             nodeIntegration: true,

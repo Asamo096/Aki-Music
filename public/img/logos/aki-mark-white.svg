@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="Aki Music">
+  <!--
+    Aki Music 占位标记（用于 Linux 自定义标题栏，需要纯白以便叠加在深色标题栏上）。
+    TODO(M5 品牌全套): 由正式设计稿替换本文件。
+  -->
+  <rect x="0.5" y="0.5" width="23" height="23" rx="7" fill="#ffffff" />
+  <path d="M9.6 6.9 L17.2 12 L9.6 17.1 Z" fill="#335eea" />
+</svg>

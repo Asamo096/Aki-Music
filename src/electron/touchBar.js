@@ -1,6 +1,7 @@
 const { TouchBar, nativeImage, ipcMain } = require('electron');
 const { TouchBarButton, TouchBarSpacer, TouchBarLabel } = TouchBar;
 const path = require('path');
+const { PRODUCT_NAME } = require('@/config/app');
 
 export function createTouchBar(window) {
   const renderer = window.webContents;
@@ -45,7 +46,7 @@ export function createTouchBar(window) {
 
   // 歌词显示标签 - 固定宽度以最大化显示空间
   const lyricLabel = new TouchBarLabel({
-    label: '♪ YesPlayMusic',
+    label: `♪ ${PRODUCT_NAME}`,
     textColor: '#FFFFFF',
   });
 
@@ -62,7 +63,7 @@ export function createTouchBar(window) {
     if (lyric && lyric.trim()) {
       lyricLabel.label = `♪ ${lyric}`;
     } else {
-      lyricLabel.label = '♪ YesPlayMusic';
+      lyricLabel.label = `♪ ${PRODUCT_NAME}`;
     }
   });
 

@@ -66,7 +66,7 @@
         {{ $t('library.userProfileMenu.logout') }}
       </div>
       <hr />
-      <div class="item" @click="toGitHub">
+      <div class="item" v-if="repoUrl" @click="toGitHub">
         <svg-icon icon-class="github" />
         {{ $t('nav.github') }}
       </div>
@@ -77,6 +77,7 @@
 <script>
 import { mapState } from 'vuex';
 import { isLooseLoggedIn, doLogout } from '@/utils/auth';
+import { REPO_URL } from '@/config/app';
 
 // import icons for win32 title bar
 // icons by https://github.com/microsoft/vscode-codicons
@@ -102,6 +103,8 @@ export default {
       keywords: '',
       enableWin32Titlebar: false,
       enableLinuxTitlebar: false,
+      // 仓库地址未配置时隐藏入口，避免指向不存在或错误的产品
+      repoUrl: REPO_URL,
     };
   },
   computed: {
@@ -158,7 +161,7 @@ export default {
       this.$router.push({ name: 'settings' });
     },
     toGitHub() {
-      window.open('https://github.com/qier222/YesPlayMusic');
+      if (this.repoUrl) window.open(this.repoUrl);
     },
     toLogin() {
       if (process.env.IS_ELECTRON === true) {

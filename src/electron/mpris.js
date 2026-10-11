@@ -1,13 +1,16 @@
 import dbus from 'dbus-next';
 import { ipcMain, app } from 'electron';
+import { PRODUCT_NAME } from '@/config/app';
 
 export function createMpris(window) {
   const Player = require('mpris-service');
   const renderer = window.webContents;
 
   const player = Player({
+    // D-Bus 上的播放器标识符。保持上游值不变：OSDLyrics 等外部工具
+    // 可能按此名称匹配播放器，改名会破坏集成。
     name: 'yesplaymusic',
-    identity: 'YesPlayMusic',
+    identity: PRODUCT_NAME,
   });
 
   player.on('next', () => renderer.send('next'));

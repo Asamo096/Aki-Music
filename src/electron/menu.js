@@ -1,4 +1,5 @@
 import defaultShortcuts from '@/utils/shortcuts';
+import { PRODUCT_NAME, REPO_URL } from '@/config/app';
 const { app, Menu } = require('electron');
 // import { autoUpdater } from "electron-updater"
 // const version = app.getVersion();
@@ -150,7 +151,7 @@ export function createMenu(win, store) {
               {
                 role: 'window',
                 id: 'window',
-                label: 'YesPlayMusic',
+                label: PRODUCT_NAME,
                 type: 'checkbox',
                 checked: true,
                 click: () => {
@@ -169,13 +170,18 @@ export function createMenu(win, store) {
     {
       label: 'Help',
       submenu: [
-        {
-          label: 'GitHub',
-          click: async () => {
-            const { shell } = require('electron');
-            await shell.openExternal('https://github.com/qier222/YesPlayMusic');
-          },
-        },
+        // 未配置仓库地址时不显示入口，避免指向不存在或错误的产品
+        ...(REPO_URL
+          ? [
+              {
+                label: 'GitHub',
+                click: async () => {
+                  const { shell } = require('electron');
+                  await shell.openExternal(REPO_URL);
+                },
+              },
+            ]
+          : []),
         {
           label: 'Electron',
           click: async () => {

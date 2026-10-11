@@ -1,6 +1,7 @@
 import initLocalStorage from './initLocalStorage';
 import pkg from '../../package.json';
 import updateApp from '@/utils/updateApp';
+import { PRODUCT_NAME } from '@/config/app';
 
 if (localStorage.getItem('appVersion') === null) {
   localStorage.setItem('settings', JSON.stringify(initLocalStorage.settings));
@@ -13,7 +14,7 @@ updateApp();
 export default {
   showLyrics: false,
   enableScrolling: true,
-  title: 'YesPlayMusic',
+  title: PRODUCT_NAME,
   liked: {
     songs: [],
     songsWithDetails: [], // 只有前12首

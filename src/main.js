@@ -1,5 +1,4 @@
 import Vue from 'vue';
-import VueGtag from 'vue-gtag';
 import App from './App.vue';
 import router from './router';
 import store from './store';
@@ -14,7 +13,7 @@ import '@/assets/css/nprogress.css';
 
 window.resetApp = () => {
   localStorage.clear();
-  indexedDB.deleteDatabase('yesplaymusic');
+  indexedDB.deleteDatabase('akimusic');
   document.cookie.split(';').forEach(function (c) {
     document.cookie = c
       .replace(/^ +/, '')
@@ -28,13 +27,8 @@ console.log(
   'background:unset;color:unset;'
 );
 
-Vue.use(
-  VueGtag,
-  {
-    config: { id: 'G-KMJJCFZDKF' },
-  },
-  router
-);
+// 上游在此处接入 Google Analytics（vue-gtag, id G-KMJJCFZDKF）。
+// 本项目不向任何第三方统计服务上报使用数据，故直接移除。
 Vue.config.productionTip = false;
 
 NProgress.configure({ showSpinner: false, trickleSpeed: 100 });

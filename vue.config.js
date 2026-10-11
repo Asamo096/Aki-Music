@@ -21,7 +21,7 @@ module.exports = {
     },
   },
   pwa: {
-    name: 'YesPlayMusic',
+    name: 'Aki Music',
     iconPaths: {
       favicon32: 'img/icons/favicon-32x32.png',
     },
@@ -38,7 +38,7 @@ module.exports = {
       entry: 'src/main.js',
       template: 'public/index.html',
       filename: 'index.html',
-      title: 'YesPlayMusic',
+      title: 'Aki Music',
       chunks: ['main', 'chunk-vendors', 'chunk-common', 'index'],
     },
   },
@@ -88,19 +88,16 @@ module.exports = {
       nodeIntegration: true,
       externals: ['@unblockneteasemusic/rust-napi'],
       builderOptions: {
-        productName: 'YesPlayMusic',
-        copyright: 'Copyright © YesPlayMusic',
+        appId: 'com.asamo.aki.player',
+        productName: 'Aki Music',
+        copyright: 'Copyright © Asamo096',
+        // 产物文件名统一为小写连字符形式，避免 productName 中的空格进入文件名
+        artifactName: 'aki-music-${os}-${version}-${arch}.${ext}',
         // compression: "maximum", // 机器好的可以打开，配置压缩，开启后会让 .AppImage 格式的客户端启动缓慢
         asar: true,
-        publish: [
-          {
-            provider: 'github',
-            owner: 'qier222',
-            repo: 'YesPlayMusic',
-            vPrefixedTagName: true,
-            releaseType: 'draft',
-          },
-        ],
+        // 发布源（publish）在 M5 配置本项目自己的仓库。
+        // 上游此处指向 qier222/YesPlayMusic，沿用会把安装包上传到上游的 Release，
+        // 因此在本项目配置好发布源之前保持不设置。
         directories: {
           output: 'dist_electron',
         },
@@ -111,7 +108,6 @@ module.exports = {
               arch: ['x64', 'arm64', 'universal'],
             },
           ],
-          artifactName: '${productName}-${os}-${version}-${arch}.${ext}',
           category: 'public.app-category.music',
           darkModeSupport: true,
         },
@@ -126,11 +122,12 @@ module.exports = {
               arch: ['x64'],
             },
           ],
-          publisherName: 'YesPlayMusic',
+          publisherName: 'Asamo096',
           icon: 'build/icons/icon.ico',
-          publish: ['github'],
         },
         linux: {
+          // Linux 可执行文件名；默认取 productName 会产生带空格的命令
+          executableName: 'aki-music',
           target: [
             {
               target: 'AppImage',

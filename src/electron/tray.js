@@ -2,6 +2,7 @@
 import path from 'path';
 import { app, nativeImage, Tray, Menu, nativeTheme } from 'electron';
 import { isLinux } from '@/utils/platform';
+import { PRODUCT_NAME } from '@/config/app';
 
 function getTrayIconTheme(store) {
   const trayIconTheme = store.get('settings.trayIconTheme');
@@ -274,7 +275,7 @@ export function createTray(win, eventEmitter, store) {
     });
 
   let tray = new Tray(icon);
-  tray.setToolTip('YesPlayMusic');
+  tray.setToolTip(PRODUCT_NAME);
 
   return isLinux
     ? new YPMTrayLinuxImpl(tray, win, eventEmitter, store)
