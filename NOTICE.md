@@ -109,16 +109,23 @@ AGPL 是**版权**许可，**不授予商标权**。下列资产继承自上游�
 
 | 资产 | 路径 | 状态 |
 |---|---|---|
-| 应用图标（各尺寸 + ico/icns） | `build/icons/*` | ⚠ 上游资产，待替换 |
+| **应用图标**（各尺寸 PNG + ico/icns） | `build/icons/*`（母图 `build/icon.png`） | ✅ **已替换为自有图标**（由 `pnpm icons` 生成） |
 | PWA / favicon 图标 | `public/img/icons/`（`favicon-*`、`apple-touch-icon*`、`mstile-*`、`android-chrome-*`、`icon.ico`、`icon.icns`、`safari-pinned-tab.svg`） | ⚠ 上游资产，待替换 |
-| 托盘图标 | `public/img/icons/menu-{dark,light}@88.png` | ⚠ 上游资产，待替换 |
+| 托盘图标 | `public/img/icons/menu-{dark,light}@88.png` | ⚠ 上游资产，待替换（需要简化单色设计，不宜直接用彩色应用图标） |
+| 托盘图标残件（未被引用） | `build/icons/menu@88.png` | ⚠ 上游资产，可与托盘图标一并清理 |
 | 上游 logo 与 README 截图 | `images/` | ✅ 已排除，未纳入本仓库 |
 | 登录页 / Last.fm 回调页 logo | `public/img/logos/aki-music.svg` | ✅ 已替换为自有占位字标 |
 | Linux 标题栏标记 | `public/img/logos/aki-mark-white.svg` | ✅ 已替换为自有占位标记 |
 | 第三方图标（网易云 / Last.fm / nyancat） | `public/img/logos/{netease-music,lastfm,nyancat*}.*` | 属各自权利人，仅用于指向对应服务，保留 |
 
-**替换方式**：`npm run electron:buildicon` 可由单张 1024×1024 源图生成 `build/icons/` 全套。
-建议在 M5「品牌全套」一次性完成，并同步替换 `public/img/icons/` 下的 PWA 与托盘图标。
+**应用图标的重生成方式**：把新母图放到 `build/icon.png`（方形、角部透明、建议 ≥1024×1024），
+执行 `pnpm icons` 即可生成 `build/icons/` 全套（16×16 … 1024×1024 PNG、多尺寸 `icon.ico`、
+`icon.icns`）。脚本见 `scripts/generate-icons.mjs`，取代了上游的 `electron-icon-builder`
+（后者依赖的 sharp 0.29 与 phantomjs-prebuilt 在 Node 24 下装不上）。
+
+**范围说明**：本次只替换了**应用图标**（窗口 / 任务栏 / 程序坞 / 安装包）。
+PWA 与 favicon 图标、托盘图标属独立资产，仍为上游资产——托盘图标尤其需要专门的
+简化单色设计，建议在 M5「品牌全套」与 PWA/favicon 一并完成。
 
 ---
 
@@ -243,13 +250,26 @@ Vite 不注入 `process.env`，也不 polyfill Node 全局，而上游代码大�
 
 - `ci.yml` 改为 Node 24 + pnpm，增加 typecheck 与 lint；仍**不发布任何产物**
 
+### M1a 补充 · 应用图标替换（2026-10-11）
+
+- `build/icon.png` 换为自有母图（1536×1536，角部透明的方形图标）
+- `build/icons/` 全套由 `pnpm icons` 重新生成：9 个尺寸 PNG、多尺寸 `icon.ico`（7 个 BMP 条目）、
+  `icon.icns`（含 ic07–ic14 现代尺寸与 il32/is32 传统回退块）
+- 删除 `build/icons/icon.png`（旧的 1024 上游图标，无任何引用）
+- 新增 `scripts/generate-icons.mjs`，取代 `electron-icon-builder`；
+  后者连同其依赖（sharp 0.29、phantomjs-prebuilt、icon-gen）一并从依赖树移除
+- 新增开发依赖：`sharp`、`png-to-ico`、`png2icons`
+- `electron-builder.yml`：Linux 图标由 `build/icons/icon.icns`（上游笔误，Linux 用不了 icns）
+  改为 PNG 尺寸目录 `build/icons/`；mac 补上 `icon: build/icons/icon.icns`
+- `pnpm-workspace.yaml`：移除已离开依赖树的 `phantomjs-prebuilt` 条目
+
 ---
 
 ## 4. 待办（阻塞对外发布）
 
 | # | 事项 | 位置 | 里程碑 |
 |---|---|---|---|
-| 1 | 替换全部上游图标资产（见第 2 节） | `build/icons/`、`public/img/icons/` | M5 |
+| 1 | 替换剩余上游图标资产：**PWA / favicon 图标与托盘图标**（应用图标已完成，见第 2 节） | `public/img/icons/`、`build/icons/menu@88.png` | M5 |
 | 2 | 填写对外仓库地址 `REPO_URL` | `src/config/app.js` | 有远程仓库后 |
 | 3 | 注册本项目 Discord 应用并填 `DISCORD_APP_ID` | `src/config/app.js` | M5 |
 | 4 | 配置 electron-builder 发布源（本项目自己的仓库） | `vue.config.js` | M5 |

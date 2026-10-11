@@ -8,6 +8,9 @@
 #   目的是把配置意图留在仓库里，而不是只存在于 git 历史。
 #
 # M1b 启用方式：增加打包脚本 `electron-builder --config electron-builder.yml`
+#
+# 图标：母图为 build/icon.png，全套由 `pnpm icons` 生成到 build/icons/
+#   （scripts/generate-icons.mjs，取代上游的 electron-icon-builder）
 
 appId: com.asamo.aki.player
 productName: Aki Music
@@ -32,6 +35,7 @@ mac:
       arch: [x64, arm64, universal]
   category: public.app-category.music
   darkModeSupport: true
+  icon: build/icons/icon.icns
 
 win:
   target:
@@ -46,7 +50,9 @@ linux:
   # Linux 可执行文件名；默认取 productName 会产生带空格的命令
   executableName: aki-music
   category: Music
-  icon: build/icons/icon.icns
+  # 指向 PNG 尺寸目录（16x16.png … 1024x1024.png），而非 .icns。
+  # 上游此处误指 build/icon.icns——那是 macOS 格式，Linux 用不了。
+  icon: build/icons/
   target:
     - target: AppImage
       arch: [x64]

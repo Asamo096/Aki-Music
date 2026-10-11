@@ -1,7 +1,36 @@
+# 默认按文本处理并使用 LF 换行；下面的列表标记真正的二进制文件。
+#
+# ⚠ 这个列表必须覆盖仓库里**所有**二进制类型：`* text eol=lf` 会让 git 把文件
+# 当文本做换行规范化，而二进制文件里出现 0x0D0A 字节序列时会被删掉 0x0D，
+# 从而**静默损坏文件**（图标、字体这类资源尤甚）。
+# 上游的列表漏了 .ico 与字体，新增图标后就踩中了；补全如下。
 * text eol=lf
-# Denote all files that are truly binary and should not be modified.
+
+# 图片与图标
 *.png binary
 *.jpg binary
-*.mp3 binary
-*.icns binary
+*.jpeg binary
 *.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+
+# 字体
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+
+# 音频
+*.mp3 binary
+*.flac binary
+*.m4a binary
+
+# 归档与可执行
+*.zip binary
+*.gz binary
+*.7z binary
+*.exe binary
+*.dll binary
+*.node binary

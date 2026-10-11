@@ -31,8 +31,8 @@
 axios            change-case      cli-color         color
 crypto-js        dayjs            dbus-next         dexie
 electron         electron-builder electron-context-menu
-electron-debug   electron-devtools-installer       electron-icon-builder
-electron-is-dev  electron-log     electron-store    electron-updater
+electron-debug   electron-devtools-installer       electron-is-dev
+electron-log     electron-store    electron-updater
 express          express-fileupload                 express-http-proxy
 extract-zip      howler           js-cookie         jsbi
 lodash           md5              mpris-service     music-metadata
@@ -47,16 +47,22 @@ vuex             x11
 ```
 @types/node  @vitejs/plugin-vue2  babel-eslint  esbuild  eslint
 eslint-config-prettier  eslint-plugin-prettier  eslint-plugin-vue
-husky  prettier  sass  typescript  vite  vite-plugin-pwa
+husky  png-to-ico  png2icons  prettier  sass  sharp  typescript
+vite  vite-plugin-pwa
 ```
+
+> `sharp` 用于生成应用图标（`scripts/generate-icons.mjs`），其平台二进制来自
+> `optionalDependencies`（`@img/sharp-*`），会随安装一并进入 —— 许可证核验时
+> 需连同这些可选依赖一起看。
 
 ### M1a 的依赖变更（核验时注意这些是新引入的）
 
 - **新增且需核验**：`vite`、`@vitejs/plugin-vue2`、`vite-plugin-pwa`、`typescript`、`dbus-next`
-  （`sass` 为升级）
+  （`sass` 为升级）；**应用图标补充**：`sharp`、`png-to-ico`、`png2icons`
 - **移除**：`@vue/cli-*`、`vue-cli-plugin-electron-builder`、`vue-template-compiler`、`core-js`、
   `esbuild-loader`、`svg-sprite-loader`、`register-service-worker`、`vue-gtag`、
-  `discord-rich-presence`（供应链原因，见 NOTICE）
+  `discord-rich-presence`（供应链原因，见 NOTICE）、
+  `electron-icon-builder`（连带 sharp 0.29 / phantomjs-prebuilt / icon-gen 一并离开依赖树）
 - **改为精确锁定**：`@neteaseapireborn/api` → `4.29.7`
 
 ### 待办（核验流程）

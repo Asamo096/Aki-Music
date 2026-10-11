@@ -4,7 +4,8 @@
 > 目标是保留 YesPlayMusic 完整的功能骨架，并把全屏歌词体验做到 [Folia](https://github.com/chthollyphile/folia-major) 的水准。
 
 **项目状态：M0（合规基线）与 M1a（构建链升级）已完成，尚不可发布。**
-工具链已换成 Vite + esbuild，应用可构建、可启动、可运行；功能代码仍是上游原样。
+工具链已换成 Vite + esbuild，应用可构建、可启动、可运行；**桌面应用图标已换为自有图标**；
+功能代码仍是上游原样。
 后续按 [二开计划书](./docs/二开计划书.md) 推进（M1b 起：Electron 升级、安全改造、api-enhanced 迁移）。
 
 ---
@@ -56,6 +57,7 @@ pnpm build:main       # 只构建主进程
 pnpm typecheck        # tsc --noEmit
 pnpm lint             # ESLint
 pnpm prettier         # 格式化 ./src
+pnpm icons            # 由 build/icon.png 生成应用图标全套 → build/icons/
 ```
 
 配置文件见 [`.env.example`](./.env.example)；所有公开默认值已写在 `vite.config.ts` 里，
@@ -93,6 +95,15 @@ M1b 升到 Electron 43 后此问题消失（其安装脚本用现代解压链路
   M5 会用 `@xhayper/discord-rpc` 重新实现。
 - **`@neteaseapireborn/api` 锁定为 `4.29.7`**：该包 4.29.10 之后是 2～6 个文件的桩包，
   用 `^4.29.7` 会解析到桩包导致内嵌 API 完全不可用，因此精确锁定。
+- **图标只替换了应用图标**：窗口 / 任务栏 / 程序坞 / 安装包用的图标已换为自有图标
+  （母图 `build/icon.png`，`pnpm icons` 生成全套）。**PWA / favicon 图标与托盘图标仍是上游资产**——
+  托盘图标需要专门的简化单色设计（彩色详图缩到 16–20px 会糊），留待后续一并处理，见 NOTICE §2。
+
+## 图标
+
+应用图标以 `build/icon.png` 为**唯一母图**（方形、角部透明、建议 ≥1024×1024），
+`pnpm icons` 生成 `build/icons/` 下的 9 个尺寸 PNG、多尺寸 `icon.ico` 与 `icon.icns`。
+换图标只需替换母图再跑一次脚本。
 
 ## 文档
 

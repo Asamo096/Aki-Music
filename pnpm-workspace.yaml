@@ -18,11 +18,11 @@ allowBuilds:
   core-js: false
   es5-ext: false
   husky: false
-  phantomjs-prebuilt: false
   plyr: false
-  # sharp 是 electron-icon-builder 的传递依赖（M5 生成图标时才用），
-  # 其安装脚本会下载原生二进制；M5 需要时改为 true。
-  sharp: false
+  # sharp 用于生成应用图标（scripts/generate-icons.mjs）。
+  # 0.35 起它的平台二进制全部来自 optionalDependencies，本身没有安装脚本，
+  # 因此这条是无实际作用的显式放行——保留它是为了表明「该依赖可信、允许其脚本」。
+  sharp: true
 
 overrides:
   icon-gen: 3.0.0
