@@ -1,0 +1,30 @@
+# pnpm 11 起，pnpm 的设置项从 package.json 的 "pnpm" 字段迁移到本文件。
+#
+# allowBuilds
+#   pnpm 默认拦截依赖的安装脚本（供应链护栏），这里逐个显式表态。
+#   只有真正需要执行脚本的包才放行：
+#   - electron：靠安装脚本下载 Electron 二进制，不放行则 Electron 无法启动
+#   - esbuild：安装脚本会校验/补装平台二进制
+#   其余包的安装脚本只是打印提示或与运行无关，一律拒绝。
+#
+# overrides（沿用上游 yarn 的 resolutions 意图）
+#   electron-builder 固定在大版本 23，与 M1a 阶段的 Electron 13 配套；
+#   icon-gen / degenerator 是传递依赖的兼容性钉子。
+
+allowBuilds:
+  electron: true
+  esbuild: true
+  '@parcel/watcher': false
+  core-js: false
+  es5-ext: false
+  husky: false
+  phantomjs-prebuilt: false
+  plyr: false
+  # sharp 是 electron-icon-builder 的传递依赖（M5 生成图标时才用），
+  # 其安装脚本会下载原生二进制；M5 需要时改为 true。
+  sharp: false
+
+overrides:
+  icon-gen: 3.0.0
+  degenerator: 2.2.0
+  electron-builder: ^23.0.0

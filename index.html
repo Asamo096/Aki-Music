@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- 由 src/utils/common.js 的 changeAppearance() 在切换深浅色时改写。
+       注意：上游此标签是 @vue/cli-plugin-pwa 在构建时注入的，模板里并没有，
+       迁移到 Vite 后必须显式写在这里，否则 Electron 构建下会因取到 null 而崩溃。 -->
+  <meta name="theme-color" content="#fff" />
+  <link rel="icon" href="/favicon.ico" />
+  <title>Aki Music</title>
+</head>
+
+<body>
+  <noscript>
+    <strong>We're sorry but Aki Music doesn't work properly without JavaScript
+      enabled. Please enable it to continue.</strong>
+  </noscript>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

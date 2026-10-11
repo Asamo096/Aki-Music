@@ -1,7 +1,6 @@
 'use strict';
 import {
   app,
-  protocol,
   BrowserWindow,
   shell,
   dialog,
@@ -17,7 +16,6 @@ import {
   isCreateTray,
   isCreateMpris,
 } from '@/utils/platform';
-import { createProtocol } from 'vue-cli-plugin-electron-builder/lib';
 import { startNeteaseMusicApi } from './electron/services';
 import { initIpcMain } from './electron/ipcMain.js';
 import { createMenu } from './electron/menu';
@@ -34,6 +32,7 @@ import Store from 'electron-store';
 import { createMpris, createDbus } from '@/electron/mpris';
 import { PRODUCT_NAME, RELEASES_URL } from '@/config/app';
 import { spawn } from 'child_process';
+import path from 'node:path';
 const clc = require('cli-color');
 const log = text => {
   console.log(`${clc.blueBright('[background.js]')} ${text}`);
@@ -111,10 +110,9 @@ class Background {
     // create Express app
     this.createExpressApp();
 
-    // Scheme must be registered before the app is ready
-    protocol.registerSchemesAsPrivileged([
-      { scheme: 'app', privileges: { secure: true, standard: true } },
-    ]);
+    // 说明：上游在此注册 app:// 特权协议，供 vue-cli-plugin-electron-builder 的
+    // createProtocol() 使用。本项目改由本地 express（27232 端口）提供渲染产物，
+    // 不再需要自定义协议，故连同 createProtocol 一起移除。
 
     // handle app events
     this.handleAppEvents();
@@ -154,7 +152,9 @@ class Background {
     log('creating express app');
 
     const expressApp = express();
-    expressApp.use('/', express.static(__dirname + '/'));
+    // 渲染进程产物目录：`vite build --mode electron` 输出到 dist/，
+    // 而本文件构建后位于 dist-electron/，因此渲染产物在 ../dist。
+    expressApp.use('/', express.static(path.join(__dirname, '..', 'dist')));
     expressApp.use('/api', expressProxy('http://127.0.0.1:10754'));
     expressApp.use('/player', (req, res) => {
       this.window.webContents
@@ -247,16 +247,15 @@ class Background {
     // hide menu bar on Microsoft Windows and Linux
     this.window.setMenuBarVisibility(false);
 
-    if (process.env.WEBPACK_DEV_SERVER_URL) {
+    if (process.env.VITE_DEV_SERVER_URL) {
       // Load the url of the dev server if in development mode
       this.window.loadURL(
         showLibraryDefault
-          ? `${process.env.WEBPACK_DEV_SERVER_URL}/#/library`
-          : process.env.WEBPACK_DEV_SERVER_URL
+          ? `${process.env.VITE_DEV_SERVER_URL}/#/library`
+          : process.env.VITE_DEV_SERVER_URL
       );
       if (!process.env.IS_TEST) this.window.webContents.openDevTools();
     } else {
-      createProtocol('app');
       this.window.loadURL(
         showLibraryDefault
           ? 'http://localhost:27232/#/library'
@@ -485,7 +484,7 @@ class Background {
     });
 
     if (!isMac) {
-      app.on('second-instance', (e, cl, wd) => {
+      app.on('second-instance', () => {
         if (this.window) {
           this.window.show();
           if (this.window.isMinimized()) {

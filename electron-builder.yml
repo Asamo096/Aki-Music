@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# electron-builder 打包配置。
+#
+# ⚠ M1a 阶段**尚未启用**：打包（安装包生成）按计划推迟到 M1b，
+#   与 Electron 13 → 43 的升级一起验证。
+#   内容来自 M0 时点的 vue.config.js（已做品牌与 publish 调整），
+#   目的是把配置意图留在仓库里，而不是只存在于 git 历史。
+#
+# M1b 启用方式：增加打包脚本 `electron-builder --config electron-builder.yml`
+
+appId: com.asamo.aki.player
+productName: Aki Music
+copyright: Copyright © Asamo096
+# 产物文件名统一为小写连字符形式，避免 productName 中的空格进入文件名
+artifactName: aki-music-${os}-${version}-${arch}.${ext}
+asar: true
+
+# 发布源（publish）在 M5 配置本项目自己的仓库。
+# 上游原配置指向 qier222/YesPlayMusic，沿用会把安装包上传到上游的 Release。
+
+directories:
+  output: dist_electron
+
+# TODO(M1b): 显式声明 files 白名单（dist/ + dist-electron/ + 生产依赖），
+# 并确认外部化依赖（express / electron-store 等）都能被正确打入产物。
+# 此处先沿用 electron-builder 默认行为。
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64, universal]
+  category: public.app-category.music
+  darkModeSupport: true
+
+win:
+  target:
+    - target: portable
+      arch: [x64]
+    - target: nsis
+      arch: [x64]
+  publisherName: Asamo096
+  icon: build/icons/icon.ico
+
+linux:
+  # Linux 可执行文件名；默认取 productName 会产生带空格的命令
+  executableName: aki-music
+  category: Music
+  icon: build/icons/icon.icns
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: tar.gz
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64, armv7l, arm64]
+    - target: rpm
+      arch: [x64]
+    - target: snap
+      arch: [x64]
+    - target: pacman
+      arch: [x64]
+
+dmg:
+  icon: build/icons/icon.icns
+
+nsis:
+  oneClick: true
+  perMachine: true
+  deleteAppDataOnUninstall: true

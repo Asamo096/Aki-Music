@@ -3,9 +3,9 @@
 > 一个桌面音乐播放器，基于 [YesPlayMusic](https://github.com/qier222/YesPlayMusic) 二次开发。
 > 目标是保留 YesPlayMusic 完整的功能骨架，并把全屏歌词体验做到 [Folia](https://github.com/chthollyphile/folia-major) 的水准。
 
-**项目状态：M0（立项与合规基线）已完成，尚不可用。**
-当前仓库是打好地基的空壳：许可证、品牌、元数据、CI 就位，功能代码仍是上游原样。
-接下来按 [二开计划书](./docs/二开计划书.md) 的里程碑推进。
+**项目状态：M0（合规基线）与 M1a（构建链升级）已完成，尚不可发布。**
+工具链已换成 Vite + esbuild，应用可构建、可启动、可运行；功能代码仍是上游原样。
+后续按 [二开计划书](./docs/二开计划书.md) 推进（M1b 起：Electron 升级、安全改造、api-enhanced 迁移）。
 
 ---
 
@@ -23,39 +23,76 @@ MV 播放、音乐云盘、音源降级链与 UnblockNeteaseMusic 解锁、Last.
 | 全屏歌词视觉模式 | 移植 Folia | M3 |
 | 歌词背景风格系统（**保留现有 4 种背景** + 新增可视化） | 自研 + 移植 Folia | M2 / M3 |
 | 双人「一起听」 | 移植 MiaoSIKI 的分支（裁剪多人房） | M4 |
-| 请求层优化（去重、缓存分层、优先级调度） | 自研 | M1 / M2 |
+| 请求层优化（去重、缓存分层、优先级调度） | 自研 | M1b / M2 |
 
 ## 技术栈
 
-| 层 | 现状（M0，继承上游） | 目标（M1 起） |
+| 层 | 现状（M1a） | 目标 |
 |---|---|---|
-| 运行时 | Node `14 \|\| 16` | Node 22 LTS |
-| 构建 | Webpack 4（`@vue/cli-service` 4.5） | Vite |
-| 框架 | Vue 2.6（Options API） | Vue 2.7 → Vue 3 |
-| 语言 | JavaScript（JSDoc 提示） | 渐进 TypeScript |
-| 桌面 | Electron 13.6.7 | Electron 43.7.5 |
-| 包管理 | yarn | pnpm |
-| 后端 | 内嵌 `@neteaseapireborn/api` 于 `127.0.0.1:10754` | 内嵌 `api-enhanced` |
+| 运行时 | **Node 24**（`.nvmrc`） | 同 |
+| 包管理 | **pnpm 11** | 同 |
+| 构建（渲染进程） | **Vite 7** + `@vitejs/plugin-vue2` | 同 |
+| 构建（主进程） | **esbuild**（`scripts/build-main.mjs`，依赖外部化） | 同 |
+| 框架 | **Vue 2.7.16** | Vue 3（M6） |
+| 语言 | JavaScript + **渐进 TypeScript**（`allowJs`） | 全量 TS |
+| 桌面 | Electron 13.6.7 | **Electron 43.7.5**（M1b） |
+| 后端起 | 内嵌 `@neteaseapireborn/api` 4.29.7 @ `127.0.0.1:10754` | 内嵌 `api-enhanced`（M1b） |
+| 测试 | 无 | Vitest + Playwright（M1b 起） |
 
 详细分析见 [技术栈分析](./docs/技术栈分析.md)。
 
 ## 开发
 
-> ⚠ **当前仍使用上游的旧工具链**，需要 Node 14 或 16。用更高版本的 Node
-> 运行 Webpack 4 很可能因 OpenSSL 报错，可临时加 `NODE_OPTIONS=--openssl-legacy-provider`。
-> M1a 会切换到 Node 22 + Vite，届时本节将重写。
-
 ```bash
-yarn install
+pnpm install
 
-yarn serve            # Web 开发（默认 http://localhost:8080）
-yarn electron:serve   # 桌面开发（同时启动内嵌 API 与本地服务）
-yarn build            # 构建 Web 产物
-yarn electron:build   # 打包当前平台的桌面安装包
-yarn lint             # ESLint
+pnpm dev              # Web 开发（http://localhost:8080，需另起 API 在 3000 端口）
+pnpm dev:electron     # 桌面开发（一条命令拉起 Vite + 主进程构建 + Electron）
+
+pnpm build            # 构建 Web 产物 → dist/
+pnpm build:electron   # 构建桌面产物 → dist/（渲染）+ dist-electron/（主进程）
+pnpm build:main       # 只构建主进程
+
+pnpm typecheck        # tsc --noEmit
+pnpm lint             # ESLint
+pnpm prettier         # 格式化 ./src
 ```
 
-配置文件见 [`.env.example`](./.env.example)。
+配置文件见 [`.env.example`](./.env.example)；所有公开默认值已写在 `vite.config.ts` 里，
+不建 `.env` 也能直接构建。
+
+桌面开发时 Electron 会同时启动两个本地服务：内嵌网易云 API（`10754`）与
+静态/代理服务（`27232`）。调试渲染进程可加 `--remote-debugging-port=9222`。
+
+## 已知问题
+
+> 这些是 M1a 阶段的已知状态，多数会在 M1b 随 Electron 升级一并解决。
+
+**1. Electron 13 的二进制在 Node 24 下装不上（需手动解压一次）**
+
+Electron 13 的安装脚本依赖 `extract-zip@1.7.0`，在 Node 24 下解压会中途停滞且**静默退出 0**，
+结果是 `node_modules/electron/dist/` 里只有 `locales` 目录。临时处理（已在本机执行过）：
+
+```bash
+cd node_modules/electron
+rm -rf dist && mkdir dist
+curl -sSL -o /tmp/electron.zip \
+  https://npmmirror.com/mirrors/electron/13.6.9/electron-v13.6.9-win32-x64.zip
+unzip -q /tmp/electron.zip -d dist && echo "electron.exe" > path.txt
+```
+
+M1b 升到 Electron 43 后此问题消失（其安装脚本用现代解压链路）。CI 不受影响：CI 只构建、不启动 Electron。
+
+**2. 内存中的稳定状态**
+
+- **打包（安装包）尚未配置**：`electron-builder.yml` 已就位但未启用，M1b 与 Electron 升级一起验证。
+- **Web 与桌面构建共用输出目录 `dist/`**：两者是同一个应用的两种目标，同时构建会互相覆盖。
+- **ESLint 仍是 6**：能运行且已清零 error，升级到 9/Biome 安排在 M1b。
+- **Discord Rich Presence 暂时移除**：上游依赖的 `discord-rich-presence@0.0.8` 有一个走 git 仓库解析的
+  子依赖（该包已从 npm 撤下），pnpm 默认拒绝这类异源子依赖。该功能此前已停用，无功能损失；
+  M5 会用 `@xhayper/discord-rpc` 重新实现。
+- **`@neteaseapireborn/api` 锁定为 `4.29.7`**：该包 4.29.10 之后是 2～6 个文件的桩包，
+  用 `^4.29.7` 会解析到桩包导致内嵌 API 完全不可用，因此精确锁定。
 
 ## 文档
 
@@ -64,7 +101,7 @@ yarn lint             # ESLint
 | [技术栈分析](./docs/技术栈分析.md) | 5 个仓库的技术栈现状、架构拆解、技术债与风险清单 |
 | [二开计划书](./docs/二开计划书.md) | 决策记录、能力来源矩阵、目标架构、模块设计、里程碑与排期 |
 | [NOTICE](./NOTICE.md) | 上游署名、许可证、品牌资产状态、相对上游的修改记录 |
-| [THIRD-PARTY](./THIRD-PARTY.md) | 依赖与许可证清单（M1 完成核验） |
+| [THIRD-PARTY](./THIRD-PARTY.md) | 依赖与许可证清单（M1b 完成核验） |
 
 > `docs/` 下的两份文档随仓库一同维护；仓库内的版本为准。
 

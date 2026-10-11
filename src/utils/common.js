@@ -199,9 +199,10 @@ export function changeAppearance(appearance) {
       : 'light';
   }
   document.body.setAttribute('data-theme', appearance);
+  // 该 meta 由 index.html 提供；取不到时不应让整个应用启动失败
   document
     .querySelector('meta[name="theme-color"]')
-    .setAttribute('content', appearance === 'dark' ? '#222' : '#fff');
+    ?.setAttribute('content', appearance === 'dark' ? '#222' : '#fff');
 }
 
 export function splitSoundtrackAlbumTitle(title) {

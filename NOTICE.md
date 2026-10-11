@@ -187,6 +187,62 @@ AGPL 是**版权**许可，**不授予商标权**。下列资产继承自上游�
 - `docker-compose.yml`：服务名 / 镜像名 / 容器名 `YesPlayMusic` → `AkiMusic` / `aki-music`
 - `.github/workflows/ci.yml`（新增）：仅做构建冒烟与 SPDX 检查，**不发布任何产物**
 
+### M1a · 构建链升级（2026-10-11）
+
+**工具链**
+
+- 构建器：`@vue/cli-service`（Webpack 4）→ **Vite 7**
+  - 删除 `vue.config.js` / `babel.config.js` / `jsconfig.json` / `public/index.html`
+  - 新增 `vite.config.ts` 与根级 `index.html`
+  - SVG 图标：上游用 webpack 专有的 `require.context` + `svg-sprite-loader`，
+    改为 `import.meta.glob` 在运行时拼 sprite（`src/assets/icons/index.js`）；`SvgIcon.vue` 无需改动
+  - PWA：`@vue/cli-plugin-pwa` → `vite-plugin-pwa`；Service Worker 由插件注入，
+    删除 `src/registerServiceWorker.js`；**PWA 仅对 Web 目标启用**，桌面构建不含 SW
+- 主进程构建：`vue-cli-plugin-electron-builder` → **esbuild**（`scripts/build-main.mjs`，依赖全部外部化）
+- 运行时与包管理：Node 14/16 → **Node 24**；yarn → **pnpm 11**
+- 框架：Vue 2.6.11 → **2.7.16**
+- 语言：引入 **TypeScript 5.9**（渐进，`allowJs`），`src/config/app.js` 改为 `app.ts`
+- 新增脚本：`dev` / `dev:electron` / `build` / `build:electron` / `build:main` / `typecheck`
+
+**`process.env` 的处理（新增代码时必须遵守的约定）**
+
+Vite 不注入 `process.env`，也不 polyfill Node 全局，而上游代码大量依赖这两者。
+`vite.config.ts` 的 `define` 表中逐个显式替换；**新增对 `process.env.X` 的引用时必须同步该表**：
+
+| 变量 | Web 构建 | 桌面渲染进程 |
+|---|---|---|
+| `process.env.IS_ELECTRON` | `false` | `true` |
+| `process.env.NODE_ENV` | 按命令 | 按命令 |
+| `process.env.VUE_APP_*` | 取自 env 或代码内默认值 | 同 |
+| `process.platform` | 替换为 `''`（无 Node 环境） | **保留真实值**（平台判断依赖它） |
+
+**移除的 webpack 魔法与上游遗留**
+
+| 项 | 处理 |
+|---|---|
+| `__static`（webpack 注入的静态目录全局） | 改为显式模块 `src/electron/staticDir.js`；顺带让 Touch Bar 只在 macOS 上创建 |
+| `createProtocol('app')` 与 `app://` 特权协议 | 移除——渲染产物一直由本地 express（27232）提供，自定义协议是冗余的 |
+| `express.static(__dirname + '/')` | 改为指向渲染产物目录 `../dist` |
+| `checkAuthToken` 的默认导入 | 该模块**没有任何导出**（纯副作用），上游靠 webpack 宽松的 ES 互操作才成立；改为副作用导入 |
+| `meta[name=theme-color]` | 上游由 `@vue/cli-plugin-pwa` 在构建期注入（模板里没有）；迁移后在 `index.html` 显式声明——缺失会让应用启动即崩溃，同时让 `changeAppearance()` 对缺失免疫 |
+| 未使用的函数参数（`background.js` / `ipcMain.js`） | 移除，使 `pnpm lint` 无 error |
+
+**依赖变更**
+
+- 移除：`@vue/cli-*`、`vue-cli-plugin-electron-builder`、`vue-template-compiler`、`core-js`、
+  `esbuild-loader`、`svg-sprite-loader`、`register-service-worker`、
+  **`discord-rich-presence`**（其子依赖经 git 仓库解析，属供应链风险，见 README 已知问题）
+- 新增：`vite`、`@vitejs/plugin-vue2`、`vite-plugin-pwa`、`typescript`、`@types/node`、
+  `sass`（升级）、`dbus-next`（本仓库直接导入，pnpm 严格布局下必须显式声明）
+- 锁定：`@neteaseapireborn/api` 由 `^4.29.7` 改为精确 `4.29.7`（4.29.10 之后是桩包，会导致内嵌 API 完全不可用）
+- 新增 `pnpm-workspace.yaml`（pnpm 11 的设置位置，只放行 electron/esbuild 的安装脚本）；
+  新增 `electron-builder.yml`（从已删除的 `vue.config.js` 提取，**M1b 才启用**）；
+  删除 `yarn.lock`（改用 pnpm），新增 `pnpm-lock.yaml`
+
+**CI**
+
+- `ci.yml` 改为 Node 24 + pnpm，增加 typecheck 与 lint；仍**不发布任何产物**
+
 ---
 
 ## 4. 待办（阻塞对外发布）

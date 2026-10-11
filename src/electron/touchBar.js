@@ -1,9 +1,14 @@
 const { TouchBar, nativeImage, ipcMain } = require('electron');
-const { TouchBarButton, TouchBarSpacer, TouchBarLabel } = TouchBar;
 const path = require('path');
 const { PRODUCT_NAME } = require('@/config/app');
+const { STATIC_DIR } = require('@/electron/staticDir');
 
 export function createTouchBar(window) {
+  // Touch Bar 是 macOS 专有硬件，其他平台上该 API 无意义。
+  // 上游未做平台判断，会让这段代码在 Windows/Linux 上照样执行。
+  if (process.platform !== 'darwin') return null;
+
+  const { TouchBarButton, TouchBarSpacer, TouchBarLabel } = TouchBar;
   const renderer = window.webContents;
 
   // Icon follow touchbar design guideline.
@@ -11,8 +16,7 @@ export function createTouchBar(window) {
   // Icon Resource: https://devimages-cdn.apple.com/design/resources/
   function getNativeIcon(name) {
     return nativeImage.createFromPath(
-      // eslint-disable-next-line no-undef
-      path.join(__static, 'img/touchbar/', name)
+      path.join(STATIC_DIR, 'img/touchbar/', name)
     );
   }
 

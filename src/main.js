@@ -5,7 +5,8 @@ import store from './store';
 import i18n from '@/locale';
 import '@/assets/icons';
 import '@/utils/filters';
-import './registerServiceWorker';
+// Service Worker 改由 vite-plugin-pwa 在 Web 构建时自动注入
+// （Electron 构建不启用 PWA，见 vite.config.ts）
 import { dailyTask } from '@/utils/common';
 import '@/assets/css/global.scss';
 import NProgress from 'nprogress';

@@ -788,7 +788,9 @@
 
       <div class="footer">
         <p class="author">
-          <a v-if="repoUrl" :href="repoUrl" target="_blank">{{ productName }}</a>
+          <a v-if="repoUrl" :href="repoUrl" target="_blank">{{
+            productName
+          }}</a>
           <span v-else>{{ productName }}</span>
         </p>
         <p class="author">

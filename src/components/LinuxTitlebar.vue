@@ -1,7 +1,8 @@
 <template>
   <div class="linux-titlebar">
     <div class="logo">
-      <img src="img/logos/aki-mark-white.svg" />
+      <!-- 注意前导斜杠：该文件在 public/ 下，Vite 不像 webpack 那样把无斜杠路径当模块解析 -->
+      <img src="/img/logos/aki-mark-white.svg" />
     </div>
     <div class="title">{{ title }}</div>
     <div class="controls">

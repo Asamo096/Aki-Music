@@ -6,13 +6,15 @@ on:
   pull_request:
   workflow_dispatch:
 
-# 说明：本工作流只做「构建 + 合规」检查，**不发布任何产物**。
+# 说明：本工作流只做「构建 + 类型 + 合规」检查，**不发布任何产物**。
 # 打包发布（三平台安装包 + Release）在 M5 配置好本项目自己的发布源后再新增，
 # 届时必须指向本项目仓库——上游的 build.yaml 会发布到 qier222/YesPlayMusic。
+#
+# 注意：CI 不启动 Electron（只构建），因此不依赖 Electron 二进制的安装结果。
 
 jobs:
   build:
-    name: Build (Node 16 + yarn)
+    name: Build & check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,23 +22,37 @@ jobs:
           # SPDX 检查需要基线 tag
           fetch-depth: 0
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 16
-          cache: yarn
+          node-version: 24
+          cache: pnpm
 
       - name: Install dependencies
-        # --ignore-optional：跳过平台相关的可选依赖，避免 Linux 上解析 macOS/Windows 专用包
-        run: yarn install --ignore-optional
+        run: pnpm install
 
-      - name: Build (web)
-        run: yarn build
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build (Web)
+        run: pnpm build
+
+      - name: Build (Electron renderer + main process)
+        run: pnpm build:electron
 
       - name: Upload build output
         uses: actions/upload-artifact@v4
         with:
-          name: aki-music-web-dist
-          path: dist/
+          name: aki-music-dist
+          path: |
+            dist/
+            dist-electron/
           if-no-files-found: warn
 
   compliance:

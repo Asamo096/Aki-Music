@@ -5,7 +5,7 @@ import cloneDeep from 'lodash/cloneDeep';
 import shortcuts from '@/utils/shortcuts';
 import { createMenu } from './menu';
 import { isCreateTray, isMac } from '@/utils/platform';
-import { DISCORD_APP_ID, PRODUCT_NAME } from '@/config/app';
+import { PRODUCT_NAME } from '@/config/app';
 
 const clc = require('cli-color');
 const log = text => {
@@ -72,12 +72,15 @@ const exitAskWithoutMac = (e, win) => {
     });
 };
 
-// Discord Rich Presence 需要属于本项目自己的 Discord 应用 ID；
-// 未配置时整条链路停用，避免在 Discord 上显示为上游产品。
-// TODO(M5 发布前): 注册 Aki Music 的 Discord 应用并填入 DISCORD_APP_ID。
-const client = DISCORD_APP_ID
-  ? require('discord-rich-presence')(DISCORD_APP_ID)
-  : null;
+// Discord Rich Presence 需要属于本项目自己的 Discord 应用 ID（见 src/config/app.js）。
+//
+// 上游实现依赖 discord-rich-presence@0.0.8，而它的子依赖 discord-rpc 系通过
+// git 仓库解析（该包已从 npm 撤下）——pnpm 默认拒绝这类"异源子依赖"，属供应链风险，
+// 故在 M1a 阶段连同依赖一起移除。该功能此前已因缺少自有 App ID 而停用，无功能损失。
+//
+// TODO(M5 发布前): 用维护中的 @xhayper/discord-rpc 重新实现，
+// 并把 Discord 应用 ID 填入 src/config/app.ts 的 DISCORD_APP_ID。
+const client = null;
 
 /**
  * Make data a Buffer.
@@ -281,7 +284,7 @@ export function initIpcMain(win, store, trayEventEmitter) {
     );
   });
 
-  ipcMain.on('removeProxy', (event, arg) => {
+  ipcMain.on('removeProxy', () => {
     log('removeProxy');
     win.webContents.session.setProxy({});
     store.set('proxy', '');

@@ -26,6 +26,8 @@ pnpm-debug.log*
 
 #Electron-builder output
 /dist_electron
+# 主进程构建产物（scripts/build-main.mjs → esbuild）
+/dist-electron
 NeteaseCloudMusicApi-master
 NeteaseCloudMusicApi-master.zip
 

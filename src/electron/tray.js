@@ -1,8 +1,8 @@
-/* global __static */
 import path from 'path';
 import { app, nativeImage, Tray, Menu, nativeTheme } from 'electron';
 import { isLinux } from '@/utils/platform';
 import { PRODUCT_NAME } from '@/config/app';
+import { STATIC_DIR } from '@/electron/staticDir';
 
 function getTrayIconTheme(store) {
   const trayIconTheme = store.get('settings.trayIconTheme');
@@ -15,7 +15,7 @@ function getTrayIconTheme(store) {
 
 function createMenuIcon(filename, iconTheme) {
   const image = nativeImage.createFromPath(
-    path.join(__static, `img/icons/${filename}.png`)
+    path.join(STATIC_DIR, `img/icons/${filename}.png`)
   );
 
   if (iconTheme === 'dark') return image;
@@ -178,7 +178,9 @@ class YPMTrayLinuxImpl {
     }
 
     let icon = nativeImage
-      .createFromPath(path.join(__static, `img/icons/menu-${iconTheme}@88.png`))
+      .createFromPath(
+        path.join(STATIC_DIR, `img/icons/menu-${iconTheme}@88.png`)
+      )
       .resize({
         height: 20,
         width: 20,
@@ -248,7 +250,9 @@ class YPMTrayWindowsImpl {
     }
 
     let icon = nativeImage
-      .createFromPath(path.join(__static, `img/icons/menu-${iconTheme}@88.png`))
+      .createFromPath(
+        path.join(STATIC_DIR, `img/icons/menu-${iconTheme}@88.png`)
+      )
       .resize({
         height: 20,
         width: 20,
@@ -268,7 +272,7 @@ export function createTray(win, eventEmitter, store) {
   }
 
   let icon = nativeImage
-    .createFromPath(path.join(__static, `img/icons/menu-${iconTheme}@88.png`))
+    .createFromPath(path.join(STATIC_DIR, `img/icons/menu-${iconTheme}@88.png`))
     .resize({
       height: 20,
       width: 20,
