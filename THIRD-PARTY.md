@@ -46,7 +46,7 @@ x11
 @types/node  @vitejs/plugin-vue2  babel-eslint  electron  electron-builder
 esbuild  eslint  eslint-config-prettier  eslint-plugin-prettier
 eslint-plugin-vue  husky  png-to-ico  png2icons  prettier  sass  sharp
-typescript  vite  vite-plugin-pwa
+typescript  vite  vite-plugin-pwa  vitest
 ```
 
 > `electron` 与 `electron-builder` 是**构建工具**，必须在 devDependencies

@@ -22,9 +22,13 @@ directories:
   output: dist_electron
 
 # 打入产物的文件。
-# 主进程采用「依赖外部化」策略（见 scripts/build-main.mjs），因此运行时依赖
-# 必须随包分发——electron-builder 会自动收集 package.json 的 dependencies，
-# 无需在此列出 node_modules。
+#
+# ⚠ 平台配置节（win/mac/linux）里的 `files` 会**取代**本清单，而不是追加。
+#   因此凡是写了平台级 files 的地方，都必须把下面这几条基础规则**重复一遍**，
+#   否则白名单失效、整个项目根目录（src/、test/ 等）都会被塞进产物。
+#
+# 主进程采用「依赖外部化」策略（见 scripts/build-main.mjs），运行时依赖由
+# electron-builder 按 package.json 的 dependencies 自动收集，无需在此列出。
 files:
   - dist/**
   - dist-electron/**
@@ -51,6 +55,16 @@ mac:
   category: public.app-category.music
   darkModeSupport: true
   icon: build/icons/icon.icns
+  # 见 win.files 的说明：只保留 macOS 的原生二进制（基础规则需重复）
+  files:
+    - dist/**
+    - dist-electron/**
+    - package.json
+    - '!**/*.map'
+    - '!node_modules/@unblockneteasemusic/rust-napi-android-*/**'
+    - '!node_modules/@unblockneteasemusic/rust-napi-freebsd-*/**'
+    - '!node_modules/@unblockneteasemusic/rust-napi-linux-*/**'
+    - '!node_modules/@unblockneteasemusic/rust-napi-win32-*/**'
 
 win:
   target:
@@ -63,6 +77,23 @@ win:
   signtoolOptions:
     publisherName: Asamo096
   icon: build/icons/icon.ico
+  # 原生二进制按目标平台裁剪。
+  # @unblockneteasemusic/rust-napi 经 optionalDependencies 带了 13 个平台的预编译
+  # 二进制（合计约 93 MB），全部打进去会白白撑大安装包。各平台配置节都支持 files，
+  # 因此可以静态声明，不必写 afterPack 钩子。
+  # 本平台只针对 Windows x64 打包，故保留 win32-x64-msvc、剔除其余。
+  # ⚠ 基础规则必须重复（见文件顶部说明）
+  files:
+    - dist/**
+    - dist-electron/**
+    - package.json
+    - '!**/*.map'
+    - '!node_modules/@unblockneteasemusic/rust-napi-android-*/**'
+    - '!node_modules/@unblockneteasemusic/rust-napi-darwin-*/**'
+    - '!node_modules/@unblockneteasemusic/rust-napi-freebsd-*/**'
+    - '!node_modules/@unblockneteasemusic/rust-napi-linux-*/**'
+    - '!node_modules/@unblockneteasemusic/rust-napi-win32-arm64-*/**'
+    - '!node_modules/@unblockneteasemusic/rust-napi-win32-ia32-*/**'
 
 linux:
   # Linux 可执行文件名；默认取 productName 会产生带空格的命令
@@ -71,6 +102,16 @@ linux:
   # 指向 PNG 尺寸目录（16x16.png … 1024x1024.png），而非 .icns。
   # 上游此处误指 build/icon.icns——那是 macOS 格式，Linux 用不了。
   icon: build/icons/
+  # 见 win.files 的说明：只保留 Linux 的原生二进制（基础规则需重复）
+  files:
+    - dist/**
+    - dist-electron/**
+    - package.json
+    - '!**/*.map'
+    - '!node_modules/@unblockneteasemusic/rust-napi-android-*/**'
+    - '!node_modules/@unblockneteasemusic/rust-napi-darwin-*/**'
+    - '!node_modules/@unblockneteasemusic/rust-napi-freebsd-*/**'
+    - '!node_modules/@unblockneteasemusic/rust-napi-win32-*/**'
   target:
     - target: AppImage
       arch: [x64]

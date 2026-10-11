@@ -3,13 +3,13 @@
 > 一个桌面音乐播放器，基于 [YesPlayMusic](https://github.com/qier222/YesPlayMusic) 二次开发。
 > 目标是保留 YesPlayMusic 完整的功能骨架，并把全屏歌词体验做到 [Folia](https://github.com/chthollyphile/folia-major) 的水准。
 
-**项目状态：M0 / M1a / M1b 主体已完成（尚余 api-enhanced 迁移），不可对外发布。**
+**项目状态：M0 / M1 已完成，下一步是 M2（歌词引擎）；不可对外发布。**
 
 工具链已换成 Vite + esbuild，Electron 已升到 43，**渲染进程已沙箱化**
 （无 `require`/`process`，IPC 走白名单桥，开启 `webSecurity` 并配置 CSP），
-**Windows 安装包可产出**，桌面应用图标已换为自有图标。
+**Windows 安装包可产出**，桌面应用图标已换为自有图标，
+核心逻辑有单测（Vitest）并已接入 CI。
 功能代码仍是上游原样，尚不可对外发布。
-后续：api-enhanced 迁移收尾 M1b，然后进入 M2（歌词引擎）。
 
 ---
 
@@ -27,7 +27,7 @@ MV 播放、音乐云盘、音源降级链与 UnblockNeteaseMusic 解锁、Last.
 | 全屏歌词视觉模式 | 移植 Folia | M3 |
 | 歌词背景风格系统（**保留现有 4 种背景** + 新增可视化） | 自研 + 移植 Folia | M2 / M3 |
 | 双人「一起听」 | 移植 MiaoSIKI 的分支（裁剪多人房） | M4 |
-| 请求层优化（去重、缓存分层、优先级调度） | 自研 | M1b / M2 |
+| 请求层优化（去重、缓存分层、优先级调度） | 自研 | M1 已完成基础部分 / M2 补优先级调度 |
 
 ## 技术栈
 
@@ -41,8 +41,8 @@ MV 播放、音乐云盘、音源降级链与 UnblockNeteaseMusic 解锁、Last.
 | 语言 | JavaScript + **渐进 TypeScript**（`allowJs`） | 全量 TS |
 | 桌面 | **Electron 43.7.9**，渲染进程已沙箱化（preload + contextBridge + 白名单 IPC + CSP） | 同 |
 | 打包 | **electron-builder 26**（Windows 已产出安装包） | 三平台产物（M5） |
-| 后端 | 内嵌 `@neteaseapireborn/api` 4.29.7 @ `127.0.0.1:10754` | 内嵌 `api-enhanced`（M1b 收尾） |
-| 测试 | 无 | Vitest + Playwright |
+| 后端 | 内嵌 `@neteaseapireborn/api` 4.29.7 @ `127.0.0.1:10754`（**已评估不迁移**，按需补注册） | 同 |
+| 测试 | **Vitest 27 例**（歌词解析 / 请求去重 / 可播放性判断），已接入 CI | 歌词引擎的测试（M2） |
 
 详细分析见 [技术栈分析](./docs/技术栈分析.md)。
 

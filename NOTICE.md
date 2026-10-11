@@ -374,6 +374,41 @@ API 服务用 `app.use(route, handler)` 注册路由（见 `@neteaseapireborn/ap
 - `yrc` 格式：`[行起始ms,行时长ms](词起始ms,词时长ms,0)词…`；行首可能另有若干
   JSON 元数据行（作曲/编曲/制作人）需先跳过。实测 50 行 = 4 行元数据 + 45 行逐字歌词
 
+### M1b 收尾 · 请求层 / 单测 / 打包体积（2026-10-11）
+
+**请求层基础**（对应 M1 验收项「重复请求率归零」）
+
+- 新增 `src/utils/requestCache.js`：`dedupe()` 并发去重 + `requestKey()` 键归一化
+- `src/api/track.js`：`getTrackDetail` / `getLyric` / `getCloudLyric` 改为
+  **缓存优先 + 60 秒新鲜度门控**。上游这三处会先无条件发一次请求、缓存未命中时再发第二次
+- `src/utils/db.js`：缓存读取附带 `lastUpdated` / 整条 lyric 记录，供新鲜度判断
+- 5 个纯只读接口移除注入的 `timestamp`（`getArtist`、`mvDetail`、`albumDynamicDetail`、
+  `userDetail`、`cloudDiskTrackDetail`）——时间戳会让服务端 2 分钟响应缓存与本地去重同时失效。
+  有状态读（`personalFM`）、登录态（`userAccount`）、用户库列表、扫码轮询与写操作
+  **刻意保留**时间戳，避免缓存导致状态误报
+
+**单元测试**（对应 M1 验收项「核心逻辑有单测」）
+
+- 引入 Vitest 5（`test/unit/`，27 例）：歌词解析 8、请求去重 9、可播放性判断 10
+- CI 增加 `pnpm test`
+- 单测立即发现 `isTrackPlayable` 的可选链不一致（`track.fee` 等裸访问 → track 为
+  undefined 时抛错），已按该函数自身已表达出的防御意图补齐可选链
+
+**打包体积**
+
+- `@unblockneteasemusic/rust-napi` 经 optionalDependencies 带了 13 个平台的预编译
+  二进制（93 MB），全部打进产物毫无用处
+- 在 `win` / `mac` / `linux` 三个平台配置节分别声明 `files`，只保留本平台二进制
+  （Windows x64 产物：未打包体积 530M → 444M，省 86 MB）
+- ⚠ 踩到的坑：**平台级 `files` 会取代全局 `files` 而非追加**——只写排除规则会让白名单
+  失效、把整个项目根目录打进产物。已在配置顶部与各平台块注明
+
+**顺带修复的真实缺陷**
+
+- 歌单 / 专辑 / MV 三个页面缺 `$route.params.id` 监听：同路由仅参数变化时组件被复用、
+  `created()` 不再执行 → 实测「从歌单 1 跳到歌单 2，URL 变了但内容没变」。
+  已补上监听；`artist.vue` 因有 keep-alive，本来由 `activated()` 覆盖了同样的情况
+
 ---
 
 ## 4. 待办（阻塞对外发布）
