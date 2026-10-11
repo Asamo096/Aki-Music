@@ -787,10 +787,17 @@
       </div>
 
       <div class="footer">
-        <p class="author"
-          >MADE BY
-          <a href="http://github.com/qier222" target="_blank">QIER222</a></p
-        >
+        <p class="author">
+          <a v-if="repoUrl" :href="repoUrl" target="_blank">{{ productName }}</a>
+          <span v-else>{{ productName }}</span>
+        </p>
+        <p class="author">
+          基于
+          <a href="https://github.com/qier222/YesPlayMusic" target="_blank"
+            >YesPlayMusic</a
+          >
+          二次开发
+        </p>
         <p class="version">v{{ version }}</p>
 
         <a
@@ -817,6 +824,7 @@ import {
   bytesToSize,
 } from '@/utils/common';
 import { countDBSize, clearDB } from '@/utils/db';
+import { PRODUCT_NAME, REPO_URL } from '@/config/app';
 import pkg from '../../package.json';
 
 const electron =
@@ -846,6 +854,9 @@ export default {
         recording: false,
       },
       recordedShortcut: [],
+      productName: PRODUCT_NAME,
+      // 未配置仓库地址时不渲染链接
+      repoUrl: REPO_URL,
     };
   },
   computed: {

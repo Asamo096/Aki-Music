@@ -1,9 +1,9 @@
 services:
-  YesPlayMusic:
+  AkiMusic:
     build:
       context: .
-    image: yesplaymusic
-    container_name: YesPlayMusic
+    image: aki-music
+    container_name: AkiMusic
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro

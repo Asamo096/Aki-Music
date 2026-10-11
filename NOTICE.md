@@ -170,6 +170,23 @@ AGPL 是**版权**许可，**不授予商标权**。下列资产继承自上游�
 - `window.yesplaymusic` 全局对象——渲染进程与主进程的 `/player` 状态接口都依赖它
 - MPRIS D-Bus 名 `org.mpris.MediaPlayer2.yesplaymusic`——OSDLyrics 等外部工具可能按此名称匹配播放器
 
+**设置页页脚**
+
+- `src/views/settings.vue`：页脚由「MADE BY QIER222」改为 Aki Music
+  （配置 `REPO_URL` 后带链接），并保留一行「基于 YesPlayMusic 二次开发」的署名
+
+**移除的上游基础设施**
+
+| 移除项 | 原因 |
+|---|---|
+| `install-replit.sh` | 其作用是从 GitHub **克隆上游 YesPlayMusic** 来构建部署，对本发明会部署出错误的产品（Replit 部署在 M5 重写） |
+| `.github/workflows/build.yaml` | 上游的发布工作流，会把安装包发布到 `qier222/YesPlayMusic` 的 Release |
+| `.github/workflows/sync.yml` | fork 同步工作流，会把上游提交自动合入本仓库（上游已冻结；且 MIT↔AGPL 双向混流会造成许可证问题） |
+| `.github/ISSUE_TEMPLATE/----------.md` | 内容指向上游的 issue 与 Todo 看板 |
+
+- `docker-compose.yml`：服务名 / 镜像名 / 容器名 `YesPlayMusic` → `AkiMusic` / `aki-music`
+- `.github/workflows/ci.yml`（新增）：仅做构建冒烟与 SPDX 检查，**不发布任何产物**
+
 ---
 
 ## 4. 待办（阻塞对外发布）
