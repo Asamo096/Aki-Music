@@ -7,6 +7,12 @@ import store from '@/store';
 // 直接在开源前改名，避免把上游产品名带进用户数据路径。
 const db = new Dexie('akimusic');
 
+db.version(6).stores({
+  // 用户上传的歌词字体（M2-B）。存 Blob 本身：注册时用 FontFace 直接吃
+  // ArrayBuffer，不需要文件路径，也就不需要额外的 IPC / 自定义协议。
+  customFonts: '&id, createdAt',
+});
+
 db.version(5).stores({
   // 歌词引擎的数据源缓存（见 src/lyrics/sources）：
   // 存**原始返回**而不是解析结果 —— 解析只要几毫秒，而解析器版本升级后
@@ -277,4 +283,19 @@ export function clearDB() {
     });
     resolve();
   });
+}
+
+/* ── 用户上传的歌词字体（M2-B，单槽：同一时间只保留一个上传字体）── */
+
+export function saveCustomFont(record) {
+  return db.customFonts.put(record);
+}
+
+/** 取最近上传的那一个（正常情况下只会有一条） */
+export function getCustomFont() {
+  return db.customFonts.orderBy('createdAt').last();
+}
+
+export function removeCustomFont(id) {
+  return id ? db.customFonts.delete(id) : db.customFonts.clear();
 }

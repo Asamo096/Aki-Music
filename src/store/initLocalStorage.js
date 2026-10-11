@@ -15,6 +15,10 @@ let localStorage = {
     themeColor: 'default',
     musicQuality: 320000,
     lyricFontSize: 28,
+    // 歌词字体（M2-B）。预设见 src/settings/fontStacks.ts：
+    // 'app' = 沿用应用自带 Barlow（默认，观感与改造前完全一致）
+    lyricsFontPreset: 'app',
+    lyricsFontFamily: null,
     outputDevice: 'default',
     showPlaylistsByAppleMusic: true,
     enableUnblockNeteaseMusic: true,

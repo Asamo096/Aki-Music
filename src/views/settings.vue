@@ -284,6 +284,8 @@
           </select>
         </div>
       </div>
+      <LyricsFontPicker />
+      <!-- 歌词字体选择（M2-B）：预设 / 本机字体 / 上传，见 components/LyricsFontPicker.vue -->
       <div v-if="isElectron && isLinux" class="item">
         <div class="left">
           <div class="title">
@@ -835,6 +837,7 @@ import {
   isMac as isMacPlatform,
 } from '@/utils/platform';
 import pkg from '../../package.json';
+import LyricsFontPicker from '@/components/LyricsFontPicker.vue';
 
 const ipcRenderer =
   process.env.IS_ELECTRON === true ? electronIpcRenderer : null;
@@ -843,6 +846,9 @@ const validShortcutCodes = ['=', '-', '~', '[', ']', ';', "'", ',', '.', '/'];
 
 export default {
   name: 'Settings',
+  components: {
+    LyricsFontPicker,
+  },
   data() {
     return {
       tracksCache: {

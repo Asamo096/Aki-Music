@@ -296,6 +296,8 @@ import {
   getLineText,
   getLineSecondaryText,
 } from '@/lyrics';
+import { resolveLyricsFontFamily } from '@/settings/fontStacks';
+import { restoreUploadedFont } from '@/settings/customFont';
 import ButtonIcon from '@/components/ButtonIcon.vue';
 import * as Vibrant from 'node-vibrant/dist/vibrant.worker.min.js';
 import Color from 'color';
@@ -388,6 +390,8 @@ export default {
     lyricFontSize() {
       return {
         fontSize: `${this.$store.state.settings.lyricFontSize || 28}px`,
+        // 字体（M2-B）：设置 → CSS 栈的统一解析入口，见 settings/fontStacks.ts
+        fontFamily: resolveLyricsFontFamily(this.settings),
       };
     },
     noLyric() {
@@ -432,6 +436,8 @@ export default {
     this.getLyric();
     this.getCoverColor();
     this.initDate();
+    // 恢复用户上传的歌词字体（幂等；通常是热启动时库里已有记录）
+    restoreUploadedFont();
     // 在 Electron 环境下立即启动歌词定时器，以便 Touch Bar 可以显示歌词
     if (process.env.IS_ELECTRON === true) {
       this.setLyricsInterval();
