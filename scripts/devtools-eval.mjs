@@ -41,7 +41,13 @@ const body =
     : fs.readFileSync(probeFile, 'utf8');
 
 const targets = await (await fetch(`${base}/json/list`)).json();
-const page = targets.find(t => t.type === 'page' && t.url.includes('localhost'));
+// 主窗口优先：副窗口（?win=...）也来自 localhost，别把调试请求发到它们上面。
+// 需要指定副窗口时设 AKI_CDP_TARGET=desktop-lyrics / remote
+const role = process.env.AKI_CDP_TARGET || '';
+const pages = targets.filter(t => t.type === 'page' && t.url.includes('localhost'));
+const page = role
+  ? pages.find(t => t.url.includes(`win=${role}`))
+  : pages.find(t => !t.url.includes('win=')) || pages[0];
 if (!page) {
   console.error(
     `没有找到页面目标（CDP ${base}）——是不是没带 --remote-debugging-port 启动？`

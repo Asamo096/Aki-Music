@@ -34,6 +34,13 @@ import Toast from './components/Toast.vue';
 import { ipcRenderer } from './electron/ipcRenderer';
 import { isAccountLoggedIn, isLooseLoggedIn } from '@/utils/auth';
 import Lyrics from './views/lyrics.vue';
+import {
+  buildLyricsState,
+  startLyricsStateBroadcast,
+  stopLyricsStateBroadcast,
+} from '@/desktopLyrics/broadcast';
+import { CHANNELS } from '@/shared/lyricsSnapshot';
+import { ipcRenderer as electronIpcRenderer } from '@/utils/electronBridge';
 import { mapState } from 'vuex';
 
 export default {
@@ -77,9 +84,32 @@ export default {
     },
   },
   created() {
-    if (this.isElectron) ipcRenderer(this);
+    if (this.isElectron) {
+      ipcRenderer(this);
+      // 桌面歌词 / 远程控制的数据源：主窗口往外推播放态（500ms）
+      startLyricsStateBroadcast(() => buildLyricsState(this.player));
+
+      // 远程控制窗口的播放命令：音频始终在主窗口执行（M3-B）
+      if (electronIpcRenderer) {
+        // preload 的 on() 回调签名是 (占位 event, ...args)，第一个参数拿不到数据
+        electronIpcRenderer.on(CHANNELS.remoteCommand, (_event, command) => {
+          const player = this.player;
+          if (!player) return;
+          const type = typeof command === 'string' ? command : command?.type;
+          if (type === 'play-pause') player.playOrPause();
+          else if (type === 'next') player.playNextTrack();
+          else if (type === 'previous') player.playPrevTrack();
+          else if (type === 'seek' && typeof command?.position === 'number') {
+            player.seek(command.position);
+          }
+        });
+      }
+    }
     window.addEventListener('keydown', this.handleKeydown);
     this.fetchData();
+  },
+  beforeDestroy() {
+    stopLyricsStateBroadcast();
   },
   methods: {
     handleKeydown(e) {

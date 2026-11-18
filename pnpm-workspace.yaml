@@ -25,6 +25,9 @@ allowBuilds:
   electron-winstaller: false # 只服务 Squirrel.Windows，本项目用 portable + nsis
   husky: false
   plyr: false
+  #   koffi：FFI 原生模块（桌面歌词的壁纸层注入用）。3.x 在 npm 包里自带
+  #   各平台预编译二进制，安装脚本只做校验/兜底编译；显式放行。
+  koffi: true
 
 overrides:
   degenerator: 2.2.0

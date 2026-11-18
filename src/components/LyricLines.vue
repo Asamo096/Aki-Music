@@ -94,6 +94,14 @@ export default {
       type: Boolean,
       default: true,
     },
+    /**
+     * 播放位置来源（秒）。默认读主窗口的播放器；
+     * 桌面歌词/远程控制这类副窗口没有播放器，由外部注入插值后的时钟。
+     */
+    timeProvider: {
+      type: Function,
+      default: null,
+    },
   },
   data() {
     return {
@@ -144,10 +152,11 @@ export default {
         '--line-exit': `${timing.exitDuration}s`,
       };
     },
-    /** 播放位置（秒）—— 与父组件用同一个时钟源 */
+    /** 播放位置（秒）—— 主窗口用播放器，副窗口用注入的时钟 */
     currentTime() {
-      const player = this.$store.state.player;
-      return player.seek(null, false) ?? 0;
+      if (this.timeProvider) return this.timeProvider() ?? 0;
+      const player = this.$store?.state?.player;
+      return player?.seek?.(null, false) ?? 0;
     },
     /**
      * 缓存当前行的词元素。
@@ -278,6 +287,8 @@ export default {
     .translation {
       opacity: 0.28;
       transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      /* 桌面歌词等场景由外部注入阴影，保证压在任意壁纸上也能读清 */
+      text-shadow: var(--lyric-text-shadow, none);
     }
 
     .translation {

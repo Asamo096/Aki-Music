@@ -219,6 +219,25 @@ export default {
     subTitleDefault: '副標題使用別名',
     enableReversedMode: '啟用倒序播放功能 (實驗性功能)',
     enableCustomTitlebar: '啟用自訂標題列（重新啟動後生效）',
+    remote: {
+      toggle: '遠端控制視窗',
+      clickThrough: '點擊穿透（滑鼠穿過視窗）',
+      close: '關閉遠端控制',
+    },
+    desktopLyrics: {
+      toggle: '桌面歌詞（桌布層）',
+      errors: {
+        'unsupported-platform': '桌面歌詞目前只支援 Windows 11',
+        'require-win11-24h2': '桌面歌詞需要 Windows 11 24H2 以上',
+        'workerw-not-found': '找不到桌面桌布層（可嘗試重新啟動檔案總管）',
+        'set-parent-failed': '掛載到桌面失敗，請稍後重試',
+        'progman-not-found': '找不到桌面（檔案總管未執行？）',
+        'load-failed': '桌面歌詞視窗載入失敗',
+        'window-gone': '桌面歌詞視窗已關閉',
+        'lost-desktop': '桌面歌詞與桌布層的連線已中斷，已自動關閉',
+        unknown: '桌面歌詞啟動失敗',
+      },
+    },
     showLyricsTime: '顯示目前時間',
     lyricsBackground: {
       text: '顯示歌詞背景',

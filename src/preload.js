@@ -38,10 +38,26 @@ const SEND_CHANNELS = [
   'updateTrayLikeState',
   'updateTrayPlayState',
   'updateTrayTooltip',
+  // 副窗口同步（M3-A）：歌词正文 + 播放态心跳
+  'lyrics-payload',
+  'lyrics-state',
+  // 远程窗口 → 主进程的播放命令（M3-B）
+  'remote-command',
 ];
 
 /** 渲染进程 → 主进程，需要返回值 */
-const INVOKE_CHANNELS = ['unblock-music', 'show-native-alert'];
+const INVOKE_CHANNELS = [
+  'unblock-music',
+  'show-native-alert',
+  // 桌面歌词开关与状态查询（M3-A）
+  'desktop-lyrics:toggle',
+  'desktop-lyrics:query',
+  // 副窗口启动时主动拉一次缓存快照（避免与主进程首推竞争）
+  'lyrics-snapshot:request',
+  // 远程控制窗口（M3-B）
+  'remote:toggle',
+  'remote:click-through',
+];
 
 /** 主进程 → 渲染进程，事件订阅 */
 const RECEIVE_CHANNELS = [
@@ -61,6 +77,15 @@ const RECEIVE_CHANNELS = [
   'search',
   'setPosition',
   'shuffle',
+  // 副窗口订阅（桌面歌词窗口 / 远程控制窗口）
+  'lyrics-payload',
+  'lyrics-state',
+  'desktop-lyrics:status',
+  // 远程控制窗口（M3-B）
+  'remote:status',
+  'remote:click-through-state',
+  // 主窗口接收远程控制窗口的播放命令（M3-B）
+  'remote-command',
 ];
 
 const warn = (kind, channel) => {

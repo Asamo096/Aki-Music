@@ -235,6 +235,29 @@ export default {
         high: 'Yüksek Maliyet',
       },
     },
+    remote: {
+      toggle: 'Uzak Masaüstü Kontrol Penceresi',
+      clickThrough: 'Tıklamayı geçir (tıklamalar pencereden geçsin)',
+      close: 'Uzak kontrolü kapat',
+    },
+    desktopLyrics: {
+      toggle: 'Masaüstü Şarkı Sözleri (Duvar Kağıdı Katmanı)',
+      errors: {
+        'unsupported-platform':
+          'Masaüstü şarkı sözleri şu anda yalnızca Windows 11 destekler',
+        'require-win11-24h2':
+          'Masaüstü şarkı sözleri için Windows 11 24H2 veya daha yenisi gerekir',
+        'workerw-not-found':
+          'Duvar kağıdı katmanı bulunamadı (Explorer’ı yeniden başlatmayı deneyin)',
+        'set-parent-failed': 'Masaüstüne eklenemedi, lütfen tekrar deneyin',
+        'progman-not-found': 'Masaüstü bulunamadı (Explorer çalışıyor mu?)',
+        'load-failed': 'Masaüstü şarkı sözleri penceresi yüklenemedi',
+        'window-gone': 'Masaüstü şarkı sözleri penceresi kapatıldı',
+        'lost-desktop':
+          'Duvar kağıdı katmanı bağlantısı kayboldu; masaüstü şarkı sözleri kapatıldı',
+        unknown: 'Masaüstü şarkı sözleri başlatılamadı',
+      },
+    },
     closeAppOption: {
       text: 'Close App...',
       ask: 'Ask',

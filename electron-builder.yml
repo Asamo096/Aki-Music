@@ -39,6 +39,19 @@ files:
 asarUnpack:
   - '**/*.node'
 
+# koffi（桌面歌词的壁纸层注入）原生二进制的位置问题：
+#   koffi 3.x 把 .node 放在独立平台包 @koromix/koffi-<platform>-<arch> 里，而且是 koffi 的
+#   optionalDependencies；pnpm 的严格布局下它在虚拟目录里，electron-builder 不会自动
+#   带进产物（实测 asar 里只有 koffi 的 JS，没有二进制），而 extraResources 的 `from`
+#   不支持 glob。
+#   解决：beforePack 钩子（scripts/before-pack.cjs）按当前平台把该包暂存到
+#   build/native/koffi，再由这里拷进 resources/koffi —— koffi 的加载器会探测
+#   `resourcesPath/koffi/<triplet>/koffi.node`，平台包内目录名恰好是 <platform>_<arch>。
+beforePack: scripts/before-pack.cjs
+extraResources:
+  - from: build/native/koffi
+    to: koffi
+
 # 不重建原生模块。本项目的原生依赖都有现成产物或可安全缺失：
 #   - @unblockneteasemusic/rust-napi：经 optionalDependencies 分发各平台
 #     预编译二进制（win32-x64-msvc / linux-x64-gnu / darwin-x64 …），无需编译

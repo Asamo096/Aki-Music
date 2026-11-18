@@ -35,9 +35,31 @@ Vue.config.productionTip = false;
 NProgress.configure({ showSpinner: false, trickleSpeed: 100 });
 dailyTask();
 
-new Vue({
-  i18n,
-  store,
-  router,
-  render: h => h(App),
-}).$mount('#app');
+// 副窗口（桌面歌词 / 远程控制）用查询参数区分：它们只挂一个轻量根组件，
+// 不初始化路由与主界面，避免把整套应用再加载一遍。
+const windowRole = new URLSearchParams(window.location.search).get('win');
+
+if (windowRole === 'remote') {
+  document.documentElement.classList.add('is-remote-control');
+  const RemoteControl = () => import('@/views/remoteControl.vue');
+  new Vue({
+    i18n,
+    store,
+    render: h => h(RemoteControl),
+  }).$mount('#app');
+} else if (windowRole === 'desktop-lyrics') {
+  document.documentElement.classList.add('is-desktop-lyrics');
+  const DesktopLyrics = () => import('@/views/desktopLyrics.vue');
+  new Vue({
+    i18n,
+    store,
+    render: h => h(DesktopLyrics),
+  }).$mount('#app');
+} else {
+  new Vue({
+    i18n,
+    store,
+    router,
+    render: h => h(App),
+  }).$mount('#app');
+}

@@ -8,6 +8,7 @@ import {
   nativeTheme,
   screen,
   session,
+  ipcMain,
 } from 'electron';
 import {
   isWindows,
@@ -32,6 +33,26 @@ import expressProxy from 'express-http-proxy';
 import axios from 'axios';
 import Store from 'electron-store';
 import { createMpris, createDbus } from '@/electron/mpris';
+import {
+  closeDesktopLyrics,
+  disposeDesktopLyrics,
+  getDesktopLyricsStatus,
+  getCachedSnapshot,
+  isDesktopLyricsSender,
+  openDesktopLyrics,
+  cacheSnapshot,
+  setStatusReporter,
+} from '@/electron/desktopLyricsWindow';
+import {
+  cacheRemoteSnapshot,
+  disposeRemote,
+  getRemoteCachedSnapshot,
+  initRemoteIpc,
+  isRemoteSender,
+  setRemoteStatusReporter,
+} from '@/electron/remoteWindow';
+import { describeDesktop } from '@/electron/wallpaper';
+import { CHANNELS } from '@/shared/lyricsSnapshot';
 import { PRODUCT_NAME, RELEASES_URL } from '@/config/app';
 import { spawn } from 'child_process';
 import path from 'node:path';
@@ -316,6 +337,74 @@ class Background {
     // hide menu bar on Microsoft Windows and Linux
     this.window.setMenuBarVisibility(false);
 
+    // 桌面歌词（M3-A）：窗口创建后注册一次，避免 macOS 重建窗口时重复注册
+    if (!this.desktopLyricsIpcReady) {
+      this.desktopLyricsIpcReady = true;
+      const preloadPath = path.join(__dirname, 'preload.js');
+      const isMainSender = event =>
+        Boolean(this.window) && event.sender === this.window.webContents;
+
+      setStatusReporter(status => {
+        if (this.window && !this.window.isDestroyed()) {
+          this.window.webContents.send(CHANNELS.status, status);
+        }
+      });
+
+      ipcMain.handle(CHANNELS.toggle, async event => {
+        if (!isMainSender(event)) return { ok: false, reason: 'forbidden' };
+        if (getDesktopLyricsStatus().open) {
+          closeDesktopLyrics();
+          return { ok: true, status: getDesktopLyricsStatus() };
+        }
+        return openDesktopLyrics({ preload: preloadPath });
+      });
+
+      ipcMain.handle(CHANNELS.query, event => {
+        if (!isMainSender(event)) return { ok: false, reason: 'forbidden' };
+        return {
+          ok: true,
+          status: getDesktopLyricsStatus(),
+          desktop: describeDesktop(),
+        };
+      });
+
+      // 歌词正文：变更时才有（几十 KB，不做心跳）
+      ipcMain.on(CHANNELS.payload, (event, payload) => {
+        if (!isMainSender(event)) return;
+        cacheSnapshot(CHANNELS.payload, payload);
+        cacheRemoteSnapshot(CHANNELS.payload, payload);
+      });
+
+      // 播放态与样式：约 500ms 一次（几十字节）
+      ipcMain.on(CHANNELS.state, (event, state) => {
+        if (!isMainSender(event)) return;
+        cacheSnapshot(CHANNELS.state, state);
+        cacheRemoteSnapshot(CHANNELS.state, state);
+      });
+
+      // 远程控制窗口（M3-B）
+      initRemoteIpc({ mainWindow: this.window, preload: preloadPath });
+      setRemoteStatusReporter(status => {
+        if (this.window && !this.window.isDestroyed()) {
+          this.window.webContents.send(CHANNELS.remoteStatus, status);
+        }
+      });
+
+      // 副窗口首次加载主动拉缓存（主窗口也允许，便于调试）
+      ipcMain.handle('lyrics-snapshot:request', event => {
+        const allowed =
+          isMainSender(event) ||
+          isDesktopLyricsSender(event.sender) ||
+          isRemoteSender(event.sender);
+        if (!allowed) return { ok: false, reason: 'forbidden' };
+        return {
+          ok: true,
+          ...getCachedSnapshot(),
+          ...getRemoteCachedSnapshot(),
+        };
+      });
+    }
+
     if (process.env.VITE_DEV_SERVER_URL) {
       // Load the url of the dev server if in development mode
       this.window.loadURL(
@@ -599,6 +688,9 @@ class Background {
 
     app.on('before-quit', () => {
       this.willQuitApp = true;
+      // 桌面歌词窗口挂在桌面层上：先摘除再退出，否则最后一帧会留在壁纸上
+      disposeDesktopLyrics();
+      disposeRemote();
     });
 
     app.on('quit', () => {

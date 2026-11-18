@@ -135,3 +135,19 @@ a {
 .user-select-none {
   user-select: none;
 }
+
+/* 桌面歌词窗口（M3-A）：这个窗口必须完全透明，只留歌词浮在桌面上。
+   main.js 在 ?win=desktop-lyrics 时给 <html> 加 is-desktop-lyrics。
+   body 默认是 --color-body-bg（白色/深灰），不清掉就会变成一整块不透明色板。 */
+html.is-desktop-lyrics,
+html.is-desktop-lyrics body {
+  background: transparent !important;
+  overflow: hidden;
+}
+
+/* 远程控制窗口（M3-B）：同样是透明窗口，body 不能有不透明底色 */
+html.is-remote-control,
+html.is-remote-control body {
+  background: transparent !important;
+  overflow: hidden;
+}

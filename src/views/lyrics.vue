@@ -232,6 +232,24 @@
               >
                 <span class="lyric-switch-icon">音</span>
               </button-icon>
+              <!-- 远程控制窗口（M3-B） -->
+              <button-icon
+                v-if="isElectron"
+                :title="$t('remote.toggle')"
+                :class="{ active: remoteOpen }"
+                @click.native="toggleRemote"
+              >
+                <span class="lyric-switch-icon">控</span>
+              </button-icon>
+              <!-- 桌面歌词（M3-A）：把歌词挂进桌面壁纸层 -->
+              <button-icon
+                v-if="isElectron"
+                :title="$t('settings.desktopLyrics.toggle')"
+                :class="{ active: desktopLyricsOpen }"
+                @click.native="toggleDesktopLyrics"
+              >
+                <span class="lyric-switch-icon">桌</span>
+              </button-icon>
               <!-- 背景风格开关（M2-C）：与设置页共用同一份注册表 -->
               <div class="background-style-switch">
                 <button-icon
@@ -346,6 +364,8 @@ import {
   LYRIC_BACKGROUND_STYLES,
   isDarkBackgroundStyle,
 } from '@/settings/lyricBackground';
+import { publishLyricsPayload } from '@/desktopLyrics/broadcast';
+import { CHANNELS } from '@/shared/lyricsSnapshot';
 import ButtonIcon from '@/components/ButtonIcon.vue';
 import * as Vibrant from 'node-vibrant/dist/vibrant.worker.min.js';
 import Color from 'color';
@@ -381,6 +401,12 @@ export default {
       backgroundMenuOpen: false,
       /** 多色背景取到的主题色：让逐字扫过也用上封面的颜色 */
       coverAccent: '',
+      /** 桌面歌词（M3-A）开关状态 */
+      desktopLyricsOpen: false,
+      /** 远程控制窗口（M3-B）开关状态 */
+      remoteOpen: false,
+      /** 模板里用：是否 Electron 客户端（App.vue 的 data 不会传给子组件） */
+      isElectron: process.env.IS_ELECTRON === true,
       date: this.formatTime(new Date()),
       isFullscreen: !!document.fullscreenElement,
       rightClickLyric: null,
@@ -499,6 +525,34 @@ export default {
     this.initDate();
     // 恢复用户上传的歌词字体（幂等；通常是热启动时库里已有记录）
     restoreUploadedFont();
+    // 桌面歌词状态（副窗口可能因挂载失败被自动关闭）
+    if (ipcRenderer) {
+      // preload 的 on() 回调签名是 (占位 event, ...args)
+      ipcRenderer.on(CHANNELS.status, (_event, status) => {
+        this.desktopLyricsOpen = Boolean(status?.open);
+      });
+      ipcRenderer
+        .invoke(CHANNELS.query)
+        .then(result => {
+          this.desktopLyricsOpen = Boolean(result?.status?.open);
+        })
+        .catch(() => {});
+      ipcRenderer.on(CHANNELS.remoteStatus, (_event, status) => {
+        this.remoteOpen = Boolean(status?.open);
+      });
+    }
+    // 样式变化（字体/字号/翻译/主题色）后重发一次快照，副窗口跟随
+    this.$watch(
+      () => [
+        this.settings.lyricFontPreset,
+        this.settings.lyricsFontFamily,
+        this.settings.lyricFontSize,
+        this.settings.showLyricsTranslation,
+        this.lyricType,
+        this.coverAccent,
+      ],
+      () => this.publishLyricsSnapshot()
+    );
     // 在 Electron 环境下立即启动歌词定时器，以便 Touch Bar 可以显示歌词
     if (process.env.IS_ELECTRON === true) {
       this.setLyricsInterval();
@@ -628,6 +682,52 @@ export default {
         this.lyricType = 'translation';
       } else if (!this.hasTranslation && this.hasRoman) {
         this.lyricType = 'romaPronunciation';
+      }
+
+      // 推给副窗口（桌面歌词 / 远程控制）
+      this.publishLyricsSnapshot();
+    },
+    /** 把当前歌词与样式推给主进程，由它缓存并转发给副窗口 */
+    publishLyricsSnapshot() {
+      const track = this.currentTrack;
+      publishLyricsPayload(track?.id ?? null, this.lyricData, this.settings, {
+        secondary: this.secondaryLyric,
+        accent: this.coverAccent,
+        track: track
+          ? {
+              name: track.name,
+              artist: (track.ar ?? []).map(item => item.name).join(' / '),
+              cover: track.al?.picUrl ? `${track.al.picUrl}?param=96y96` : '',
+            }
+          : null,
+      });
+    },
+    /** 远程控制窗口开关 */
+    async toggleRemote() {
+      if (!ipcRenderer) return;
+      try {
+        const result = await ipcRenderer.invoke('remote:toggle');
+        this.remoteOpen = Boolean(result?.status?.open);
+      } catch (error) {
+        console.warn('[remote] 开关失败', error);
+      }
+    },
+    /** 桌面歌词开关（壁纸层） */
+    async toggleDesktopLyrics() {
+      if (!ipcRenderer) return;
+      try {
+        const result = await ipcRenderer.invoke(CHANNELS.toggle);
+        this.desktopLyricsOpen = Boolean(result?.status?.open);
+        if (!result?.ok) {
+          const key = result?.reason || 'unknown';
+          this.showToast(
+            this.$t(`settings.desktopLyrics.errors.${key}`, {
+              defaultValue: this.$t('settings.desktopLyrics.errors.unknown'),
+            })
+          );
+        }
+      } catch (error) {
+        console.warn('[desktop-lyrics] 开关失败', error);
       }
     },
     switchLyricType() {

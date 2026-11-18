@@ -232,6 +232,25 @@ export default {
       new: '新',
       cost: { low: '低开销', medium: '中开销', high: '高开销' },
     },
+    remote: {
+      toggle: '远程控制窗口',
+      clickThrough: '点击穿透（鼠标穿过窗口）',
+      close: '关闭远程控制',
+    },
+    desktopLyrics: {
+      toggle: '桌面歌词（壁纸层）',
+      errors: {
+        'unsupported-platform': '桌面歌词目前只支持 Windows 11',
+        'require-win11-24h2': '桌面歌词需要 Windows 11 24H2 及以上',
+        'workerw-not-found': '找不到桌面壁纸层（可尝试重启资源管理器）',
+        'set-parent-failed': '挂载到桌面失败，请稍后重试',
+        'progman-not-found': '找不到桌面（资源管理器未运行？）',
+        'load-failed': '桌面歌词窗口加载失败',
+        'window-gone': '桌面歌词窗口已关闭',
+        'lost-desktop': '桌面歌词与壁纸层的连接已断开，已自动关闭',
+        unknown: '桌面歌词启动失败',
+      },
+    },
     showLyricsTime: '显示当前时间',
     closeAppOption: {
       text: '关闭主面板时...',

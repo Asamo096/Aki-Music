@@ -39,3 +39,6 @@ vercel.json
 
 # pre-commit
 .pre-commit-config.yaml
+
+# 打包前由 scripts/before-pack.cjs 暂存的原生平台包（不入库）
+/build/native

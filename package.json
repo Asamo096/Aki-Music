@@ -47,6 +47,7 @@
     "howler": "^2.2.3",
     "js-cookie": "^2.2.1",
     "jsbi": "^4.1.0",
+    "koffi": "^3.3.8",
     "lodash": "^4.17.20",
     "md5": "^2.3.0",
     "mpris-service": "^2.1.2",
@@ -118,5 +119,14 @@
     "hooks": {
       "pre-commit": "npm run prettier"
     }
+  },
+  "optionalDependencies": {
+    "@unblockneteasemusic/rust-napi-win32-x64-msvc": "0.4.0",
+    "@unblockneteasemusic/rust-napi-darwin-x64": "0.4.0",
+    "@unblockneteasemusic/rust-napi-darwin-arm64": "0.4.0",
+    "@unblockneteasemusic/rust-napi-linux-x64-gnu": "0.4.0",
+    "@unblockneteasemusic/rust-napi-linux-arm64-gnu": "0.4.0",
+    "@unblockneteasemusic/rust-napi-linux-x64-musl": "0.4.0",
+    "@unblockneteasemusic/rust-napi-linux-arm64-musl": "0.4.0"
   }
 }

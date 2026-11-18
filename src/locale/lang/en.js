@@ -228,6 +228,28 @@ export default {
     subTitleDefault: 'Show Alias for Subtitle by default',
     enableReversedMode: 'Enable Reversed Mode (Experimental)',
     enableCustomTitlebar: 'Enable custom title bar (Need restart)',
+    remote: {
+      toggle: 'Remote Control Window',
+      clickThrough: 'Click-through (let clicks pass through)',
+      close: 'Close remote control',
+    },
+    desktopLyrics: {
+      toggle: 'Desktop Lyrics (Wallpaper Layer)',
+      errors: {
+        'unsupported-platform':
+          'Desktop lyrics currently support Windows 11 only',
+        'require-win11-24h2': 'Desktop lyrics require Windows 11 24H2 or newer',
+        'workerw-not-found':
+          'Wallpaper layer not found (try restarting Explorer)',
+        'set-parent-failed': 'Failed to attach to the desktop, please retry',
+        'progman-not-found': 'Desktop not found (is Explorer running?)',
+        'load-failed': 'Failed to load the desktop lyrics window',
+        'window-gone': 'Desktop lyrics window was closed',
+        'lost-desktop':
+          'Lost the wallpaper layer connection; desktop lyrics were closed',
+        unknown: 'Failed to start desktop lyrics',
+      },
+    },
     showLyricsTime: 'Display current time',
     lyricsBackground: {
       text: 'Show Lyrics Background',
