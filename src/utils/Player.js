@@ -510,6 +510,12 @@ export default class {
     }
     return getTrackDetail(id).then(data => {
       const track = data.songs[0];
+      // 曲目一旦切换，界面就立刻显示新歌了；旧音源必须**同一时刻**停掉。
+      // 否则在新音源下载完成前（网易云取不到时会走解锁插件，可能要数秒），
+      // 用户会听到上一首歌而界面已经是新歌 —— 表现为"播放的歌曲和播放页不符"。
+      if (autoplay && this._howler) {
+        this._howler.stop();
+      }
       this._currentTrack = track;
       this._updateMediaSessionMetaData(track);
       return this._replaceCurrentTrackAudio(

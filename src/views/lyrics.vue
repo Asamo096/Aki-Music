@@ -405,6 +405,10 @@ export default {
       desktopLyricsOpen: false,
       /** 远程控制窗口（M3-B）开关状态 */
       remoteOpen: false,
+      /** 歌词请求序号：换歌后旧请求晚到时用它丢弃结果（见 getLyric） */
+      lyricRequestId: 0,
+      /** 当前 lyricData 属于哪首歌（与 currentTrack.id 不一致即为 bug） */
+      lyricTrackId: null,
       /** 模板里用：是否 Electron 客户端（App.vue 的 data 不会传给子组件） */
       isElectron: process.env.IS_ELECTRON === true,
       date: this.formatTime(new Date()),
@@ -498,6 +502,12 @@ export default {
   },
   watch: {
     currentTrack() {
+      // 先清空：新歌词到达前（AMLL 最坏 5s）不能继续显示上一首的词
+      this.lyricData = null;
+      this.lyricTrackId = null;
+      this.highlightLyricIndex = -1;
+      this.instrumental = false;
+      this.publishLyricsSnapshot();
       this.getLyric();
       this.getCoverColor();
     },
@@ -645,37 +655,52 @@ export default {
      * 云盘未关联歌曲走老接口取内置歌词，再归一成同一份 LyricData。
      */
     async getLyric() {
-      if (!this.currentTrack.id) return;
+      const track = this.currentTrack;
+      if (!track?.id) return;
+
+      // 换歌很快时，多首歌的取词请求会并发；只有**最后一次**请求的结果可以上屏，
+      // 否则上一首的歌词会晚到并覆盖当前曲目（"播放的歌曲和播放页不符"）。
+      const requestId = ++this.lyricRequestId;
+      const isStale = () =>
+        requestId !== this.lyricRequestId || this.currentTrack?.id !== track.id;
+
       const isCloudTrack =
-        this.currentTrack.pc !== null &&
-        this.currentTrack.cd === null &&
+        track.pc !== null &&
+        track.cd === null &&
         this.$store.state.data.user?.userId;
 
       let data = null;
-      if (isCloudTrack) {
-        //云盘未设置关联的歌曲获取其内置歌词
-        const cloud = await getCloudLyric(
-          this.currentTrack.id,
-          this.$store.state.data.user?.userId
-        );
-        data =
-          cloud?.lrc?.length > 0
-            ? parseLyricPayload(cloud.lrc, { format: 'lrc' })
-            : null;
-      } else {
-        data = await loadLyrics(this.currentTrack.id, {
-          preferredLangs: this.$i18n?.locale ? [this.$i18n.locale] : [],
-        });
+      try {
+        if (isCloudTrack) {
+          //云盘未设置关联的歌曲获取其内置歌词
+          const cloud = await getCloudLyric(
+            track.id,
+            this.$store.state.data.user?.userId
+          );
+          data =
+            cloud?.lrc?.length > 0
+              ? parseLyricPayload(cloud.lrc, { format: 'lrc' })
+              : null;
+        } else {
+          data = await loadLyrics(track.id, {
+            preferredLangs: this.$i18n?.locale ? [this.$i18n.locale] : [],
+          });
+        }
+      } catch (error) {
+        console.warn('[lyrics] 取词失败', error);
+        data = null;
       }
+      if (isStale()) return; // 过期结果：直接丢弃，不碰当前状态
 
       const filtered = filterNeteaseLyricNoise(
         data?.lines ?? [],
-        this.currentTrack?.ar?.[0]?.name
+        track?.ar?.[0]?.name
       );
       this.instrumental = filtered.instrumental;
       this.lyricData = filtered.lines.length
         ? { ...data, lines: filtered.lines }
         : null;
+      this.lyricTrackId = track.id;
       this.highlightLyricIndex = -1;
 
       if (this.hasTranslation && !this.hasRoman) {
