@@ -99,6 +99,7 @@ const startHeartbeat = () => {
 };
 
 const shutdown = (reason = 'closed') => {
+  console.log(`[desktop-lyrics] 关闭窗口（${reason}）`);
   clearHeartbeat();
   const current = win;
   const handle = attached?.handle ?? null;

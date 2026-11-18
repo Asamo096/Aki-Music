@@ -33,7 +33,6 @@ console.log(
 Vue.config.productionTip = false;
 
 NProgress.configure({ showSpinner: false, trickleSpeed: 100 });
-dailyTask();
 
 // 副窗口（桌面歌词 / 远程控制）用查询参数区分：它们只挂一个轻量根组件，
 // 不初始化路由与主界面，避免把整套应用再加载一遍。
@@ -56,6 +55,9 @@ if (windowRole === 'remote') {
     render: h => h(DesktopLyrics),
   }).$mount('#app');
 } else {
+  // 日常任务（签到/刷新 cookie/清理缓存）只在主窗口跑；副窗口跑一遍没有意义，
+  // 还会重复发请求、重复写 localStorage。
+  dailyTask();
   new Vue({
     i18n,
     store,

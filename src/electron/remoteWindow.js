@@ -134,6 +134,7 @@ export const cacheRemoteSnapshot = (channel, data) => {
 export const getRemoteCachedSnapshot = () => ({ ...cached });
 
 const shutdown = () => {
+  console.log('[remote] 关闭窗口');
   stopHotspotPolling();
   clickThroughEnabled = false;
   unlockHover = false;
