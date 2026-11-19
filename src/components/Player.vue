@@ -185,7 +185,7 @@ import { mapState, mapMutations, mapActions } from 'vuex';
 import '@/assets/css/slider.css';
 
 import ButtonIcon from '@/components/ButtonIcon.vue';
-import VueSlider from 'vue-slider-component';
+import AkiSlider from '@/components/AkiSlider.vue';
 import { goToListSource, hasListSource } from '@/utils/playList';
 import { formatTrackTime } from '@/utils/common';
 
@@ -193,7 +193,7 @@ export default {
   name: 'Player',
   components: {
     ButtonIcon,
-    VueSlider,
+    'vue-slider': AkiSlider,
   },
   data() {
     return {

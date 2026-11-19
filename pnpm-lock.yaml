@@ -113,9 +113,6 @@ importers:
       vue-router:
         specifier: ^3.4.3
         version: 3.6.5(vue@2.7.16)
-      vue-slider-component:
-        specifier: ^3.2.5
-        version: 3.2.24(vue@2.7.16)
       vuex:
         specifier: ^3.4.0
         version: 3.6.2(vue@2.7.16)
@@ -2265,9 +2262,6 @@ packages:
   core-js-compat@3.50.0:
     resolution: {integrity: sha512-XGpFGbMLHwSt74YLTKho7Ib242qi6O8MSX+sRokV4oz7iKXvQWGYZthjIhjRGMxjzVkAubBO512dKGYcefmX3Q==}
     engines: {node: '>=6.4.0'}
-
-  core-js@3.50.0:
-    resolution: {integrity: sha512-BRWgOLKkFeCgRudR6zrs8p9XJZcE14grzKMMssoYrk6krtuEZ7MTKPIY5RzOnqsEKIR9kst7wNzphttraT+Yqw==}
 
   core-util-is@1.0.3:
     resolution: {integrity: sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ==}
@@ -4841,11 +4835,6 @@ packages:
     resolution: {integrity: sha512-Hzclzhz9ouj5sfjDbXE78fciSGwDrlOMimkRIxFNy0pmHoexzLH1+OKTbrlR+Gz17C9ZCfX7Mlpq21jGsyhgSg==}
     deprecated: This package is deprecated, please use @vscode/codicons https://www.npmjs.com/package/@vscode/codicons
 
-  vue-class-component@7.2.6:
-    resolution: {integrity: sha512-+eaQXVrAm/LldalI272PpDe3+i4mPis0ORiMYxF6Ae4hyuCh15W8Idet7wPUEs4N4YptgFHGys4UrgNQOMyO6w==}
-    peerDependencies:
-      vue: ^2.0.0
-
   vue-clipboard2@0.3.3:
     resolution: {integrity: sha512-aNWXIL2DKgJyY/1OOeITwAQz1fHaCIGvUFHf9h8UcoQBG5a74MkdhS/xqoYe7DNZdQmZRL+TAdIbtUs9OyVjbw==}
 
@@ -4861,18 +4850,10 @@ packages:
     peerDependencies:
       vue: ^2
 
-  vue-property-decorator@8.5.1:
-    resolution: {integrity: sha512-O6OUN2OMsYTGPvgFtXeBU3jPnX5ffQ9V4I1WfxFQ6dqz6cOUbR3Usou7kgFpfiXDvV7dJQSFcJ5yUPgOtPPm1Q==}
-    peerDependencies:
-      vue: '*'
-
   vue-router@3.6.5:
     resolution: {integrity: sha512-VYXZQLtjuvKxxcshuRAwjHnciqZVoXAjTjcqBTz4rKc8qih9g9pI3hbDjmqXaHdgL3v8pV6P8Z335XvHzESxLQ==}
     peerDependencies:
       vue: ^2
-
-  vue-slider-component@3.2.24:
-    resolution: {integrity: sha512-28hfotAL/CPXPwqHgVFyUwUEV0zweoc2wW0bgraGkoIcRZGlFjk8caYJLE8+Luug5t3b9tJm/NyDXpyIdmcYZg==}
 
   vue@2.7.16:
     resolution: {integrity: sha512-4gCtFXaAA3zYZdTp5s4Hl2sozuySsgz4jy1EnpBHNfpMa9dK1ZCG7viqBPCwXtmgc8nHqUsAu3G4gtmXkkY3Sw==}
@@ -7223,8 +7204,6 @@ snapshots:
   core-js-compat@3.50.0:
     dependencies:
       browserslist: 4.29.3
-
-  core-js@3.50.0: {}
 
   core-util-is@1.0.3: {}
 
@@ -10139,10 +10118,6 @@ snapshots:
 
   vscode-codicons@0.0.17: {}
 
-  vue-class-component@7.2.6(vue@2.7.16):
-    dependencies:
-      vue: 2.7.16
-
   vue-clipboard2@0.3.3:
     dependencies:
       clipboard: 2.0.11
@@ -10164,21 +10139,9 @@ snapshots:
     dependencies:
       vue: 2.7.16
 
-  vue-property-decorator@8.5.1(vue@2.7.16):
-    dependencies:
-      vue: 2.7.16
-      vue-class-component: 7.2.6(vue@2.7.16)
-
   vue-router@3.6.5(vue@2.7.16):
     dependencies:
       vue: 2.7.16
-
-  vue-slider-component@3.2.24(vue@2.7.16):
-    dependencies:
-      core-js: 3.50.0
-      vue-property-decorator: 8.5.1(vue@2.7.16)
-    transitivePeerDependencies:
-      - vue
 
   vue@2.7.16:
     dependencies:

@@ -343,7 +343,7 @@
 // Some of the codes are from https://github.com/sl1673495/vue-netease-music
 
 import { mapState, mapMutations, mapActions } from 'vuex';
-import VueSlider from 'vue-slider-component';
+import AkiSlider from '@/components/AkiSlider.vue';
 import ContextMenu from '@/components/ContextMenu.vue';
 import LyricLines from '@/components/LyricLines.vue';
 import { formatTrackTime } from '@/utils/common';
@@ -383,7 +383,7 @@ const ipcRenderer =
 export default {
   name: 'Lyrics',
   components: {
-    VueSlider,
+    'vue-slider': AkiSlider,
     ButtonIcon,
     ContextMenu,
     LyricLines,

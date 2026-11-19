@@ -9,7 +9,6 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 
-
 /**
  * 构建期断言：渲染产物里不能出现 Vue 的开发版。
  *
@@ -30,7 +29,8 @@ const assertProductionVue = () => ({
     bundle: Record<string, any>
   ) {
     for (const file of Object.values(bundle)) {
-      if (!file || file.type !== 'chunk' || typeof file.code !== 'string') continue;
+      if (!file || file.type !== 'chunk' || typeof file.code !== 'string')
+        continue;
       if (file.code.includes('You are running Vue in development mode')) {
         this.error(
           '构建产物包含 Vue 开发版（renderer 会带开发期断言，可能抛 getTagNamespace(undefined) 之类的错误）。' +
@@ -99,26 +99,8 @@ export default defineConfig(({ command, mode }) => {
     ],
 
     resolve: {
-      alias: {
-        '@': path.resolve(root, 'src'),
-        // 单一 Vue：CJS 依赖（如 slider 的 common 构建 require('vue')）也解析到同一份
-        // ESM 运行时，否则产物里会同时出现 ESM 与 CJS 两个 Vue（各自一套 config）。
-        'vue': require.resolve('vue/dist/vue.runtime.esm.js'),
-        /**
-         * vue-slider-component 的 package.json 只有 `main` 指向 **UMD 预打包版**
-         * （dist/vue-slider-component.umd.min.js），而那个 bundle 里**内联了一份
-         * 精简版 Vue 运行时**：产物里因此出现两份 Vue（两份 config / 两套运行时），
-         * 其内联那份的 _createElement 调用 config.getTagNamespace() 时缺少参数，
-         * 一旦渲染到 undefined tag 就抛
-         * "Cannot read properties of undefined (reading 'toLowerCase')"（实测复现）。
-         *
-         * 指向 webpack 的 common.js 构建：它把 vue 标为 external（require('vue')），
-         * 配合下面的 dedupe 保证整个应用只有一份 Vue。
-         */
-        'vue-slider-component': require.resolve(
-          'vue-slider-component/dist/vue-slider-component.common.js'
-        ),
-      },
+      // 数组形式：允许「正则只匹配包名本身」这种条目（见下）
+      alias: [{ find: '@', replacement: path.resolve(root, 'src') }],
       // 依赖里所有对 'vue' 的引用都解析到同一份（避免再出现第二份运行时）
       dedupe: ['vue'],
       extensions: ['.ts', '.js', '.mjs', '.json', '.vue'],
