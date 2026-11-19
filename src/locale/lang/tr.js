@@ -334,7 +334,7 @@ export default {
     ownerHint:
       'Oda senin oynatmanı izler: üyeler oynat/duraklat/şarkı değişimlerini takip eder.',
     memberHint:
-      'Sunucuyu takip ediyorsun; NetEase üye işlemlerini yalnızca resmi istemcinin gerçek zamanlı kanalına iter, bu yüzden sunucu seni takip etmez.',
+      'Sunucuyu takip ediyorsun; oynat/duraklat/şarkı değişimlerin de bildirilir (resmi istemci bunları gerçek zamanlı alır; Aki sunucusu üye işlemlerini okuyamaz).',
     leaveRoom: 'Odadan Ayrıl',
   },
   contextMenu: {

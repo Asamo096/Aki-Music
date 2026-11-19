@@ -11,10 +11,12 @@
 // 机制说明（这些是原本最有价值的工程部分，不要简化掉）：
 //   - 上报指令带自增 clientSeq；应用远端指令时忽略自己的 seq（多设备同账号也能区分）
 //   - 同一条指令只应用一次：用 serverSeq|clientSeq|songId|progress|status 签名去重
-//   - 跟随远端后 20 秒内不再回传（_remoteSuppressUntil），避免"跟随 → 回显 → 对方又对齐"死循环
+//   - 跟随远端后 1.5 秒内不再回传（_remoteSuppressUntil），只盖住应用指令本身的回声，
+//     避免"跟随 → 回显 → 对方又对齐"死循环，又不吞掉用户接下来的操作
 //   - 进度只在**落后超过 5 秒**时向前对齐，绝不回退，避免频繁跳变
 //   - 房间失效只认心跳错误码 488；其它错误只重试（网络抖动不踢人）
 //   - 用户手动切歌后 20 秒内不被远端强行拉回
+//   - 本地换歌上报去抖 500ms（连续自动跳歌只报最终目标）
 
 import store from '@/store';
 import {
@@ -45,8 +47,14 @@ const HEARTBEAT_INTERVAL = 20000;
 const STATUS_POLL_INTERVAL = 15000;
 /** 播放指令/歌单轮询：自动跟随延迟的关键（验收要求 4 秒内跟随） */
 const PLAYBACK_POLL_INTERVAL = 4000;
-/** 跟随远端后抑制回传的窗口 */
-const REMOTE_SUPPRESS_MS = 20000;
+/**
+ * 跟随远端后抑制回传的窗口。
+ *
+ * 只需要盖住"应用远端指令"本身产生的本地回调（play/pause/seek 会在同一轮里触发上报），
+ * 所以 1.5 秒足够；参考实现的 20 秒会把用户接下来 20 秒内的切歌/暂停全部吞掉
+ * （实测：切歌后暂停无法同步、切歌反馈延迟都由此造成）。
+ */
+const REMOTE_SUPPRESS_MS = 1500;
 /** 用户手动切歌后的保护窗口 */
 const USER_OVERRIDE_MS = 20000;
 /** 进度对齐容差：只在落后超过该值时向前对齐 */
@@ -75,6 +83,8 @@ class ListenTogetherService {
     this._playbackTimer = null;
     this._heartbeatFailures = 0;
     this._lastTrackId = null;
+    /** GOTO 上报去抖定时器（连续跳歌时只发最终目标） */
+    this._gotoTimer = null;
   }
 
   get inRoom() {
@@ -163,6 +173,10 @@ class ListenTogetherService {
   }
 
   _stopTimers() {
+    if (this._gotoTimer) {
+      clearTimeout(this._gotoTimer);
+      this._gotoTimer = null;
+    }
     for (const key of ['_heartbeatTimer', '_statusTimer', '_playbackTimer']) {
       if (this[key]) {
         clearInterval(this[key]);
@@ -369,10 +383,6 @@ class ListenTogetherService {
    */
   async reportPlayCommand(commandType, options = {}) {
     if (!this.inRoom) return;
-    // 只有房主的指令能被其他成员通过 sync/playlist/get 读到；
-    // 成员的上报只会进 NIM（官方客户端的实时通道），本项目订阅不到，
-    // 因此成员不再上报，避免"看起来同步了其实没有"的误解（见计划书 M4 记录）。
-    if (!this.isOwner) return;
     const player = store.state.player;
     const targetSongId = options.targetSongId ?? player?.currentTrackID ?? '';
     if (!targetSongId) return;
@@ -548,6 +558,7 @@ class ListenTogetherService {
       } finally {
         this._remoteApplying = false;
       }
+      this._lastTrackId = cmd.targetSongId;
     }
 
     if (cmd.playStatus === 'PAUSE' && player.playing) {
@@ -584,14 +595,42 @@ class ListenTogetherService {
 
   /* ── 播放器钩子 ── */
 
+  /**
+   * 换歌上报（去抖）。
+   *
+   * 为什么去抖：不可播放的曲目会让播放器连续跳到下一首，每次跳都触发这里；
+   * 若逐次上报，对方会跟着跳成一串，最后停在与本机不同的歌上（实测"播放的音乐不一致"）。
+   * 这里等 500ms 内的连续切换停下来，只报最终的目标歌曲。
+   */
   onTrackChange() {
-    if (!this.inRoom || !this.isOwner || this._remoteApplying) return;
+    if (!this.inRoom || this._remoteApplying) return;
     const trackId = store.state.player?.currentTrackID;
-    if (trackId && trackId !== this._lastTrackId) {
-      // 用户手动切歌：20 秒内不被远端强行拉回（参考实现的用户覆盖窗口）
-      this._userOverrideSongId = String(trackId);
-      this._userOverrideUntil = Date.now() + USER_OVERRIDE_MS;
+    if (!trackId || trackId === this._lastTrackId) return;
+
+    // 用户手动切歌：20 秒内不被远端强行拉回（参考实现的用户覆盖窗口）
+    this._userOverrideSongId = String(trackId);
+    this._userOverrideUntil = Date.now() + USER_OVERRIDE_MS;
+
+    if (this._gotoTimer) clearTimeout(this._gotoTimer);
+    this._gotoTimer = setTimeout(() => {
+      this._gotoTimer = null;
+      const finalTrackId = store.state.player?.currentTrackID;
+      if (!finalTrackId) return;
       this.reportPlayCommand('GOTO', {
+        formerSongId: this._lastTrackId ?? -1,
+        targetSongId: finalTrackId,
+      });
+    }, 500);
+  }
+
+  /** 立刻发出待发的 GOTO（避免顺序错乱：先切歌再暂停） */
+  async _flushPendingGoto() {
+    if (!this._gotoTimer) return;
+    clearTimeout(this._gotoTimer);
+    this._gotoTimer = null;
+    const trackId = store.state.player?.currentTrackID;
+    if (trackId) {
+      await this.reportPlayCommand('GOTO', {
         formerSongId: this._lastTrackId ?? -1,
         targetSongId: trackId,
       });
@@ -599,20 +638,20 @@ class ListenTogetherService {
   }
 
   onPlay() {
-    if (!this.inRoom || !this.isOwner || Date.now() < this._remoteSuppressUntil)
-      return;
+    if (!this.inRoom || Date.now() < this._remoteSuppressUntil) return;
+    this._flushPendingGoto();
     this.reportPlayCommand('PLAY');
   }
 
-  onPause() {
-    if (!this.inRoom || !this.isOwner || Date.now() < this._remoteSuppressUntil)
-      return;
+  async onPause() {
+    if (!this.inRoom || Date.now() < this._remoteSuppressUntil) return;
+    await this._flushPendingGoto();
     this.reportPlayCommand('PAUSE');
   }
 
-  onSeek() {
-    if (!this.inRoom || !this.isOwner || Date.now() < this._remoteSuppressUntil)
-      return;
+  async onSeek() {
+    if (!this.inRoom || Date.now() < this._remoteSuppressUntil) return;
+    await this._flushPendingGoto();
     this.reportPlayCommand('seek');
   }
 }

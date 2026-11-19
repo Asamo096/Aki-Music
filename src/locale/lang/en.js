@@ -342,7 +342,7 @@ export default {
     ownerHint:
       'The room follows your playback: members will follow your play/pause/track changes.',
     memberHint:
-      'You are following the host; NetEase only pushes member actions through its real-time channel to the official client, so the host will not follow you.',
+      'You are following the host; your play/pause/track changes are reported too (the official client receives them in real time; an Aki host cannot read member actions).',
     leaveRoom: 'Leave Room',
   },
   contextMenu: {
