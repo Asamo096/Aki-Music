@@ -339,6 +339,10 @@ export default {
     followOwner: 'Follow the host automatically',
     followHint:
       'Syncs the host playback/pause/track changes and position (drift is corrected only beyond 5s).',
+    ownerHint:
+      'The room follows your playback: members will follow your play/pause/track changes.',
+    memberHint:
+      'You are following the host; NetEase only pushes member actions through its real-time channel to the official client, so the host will not follow you.',
     leaveRoom: 'Leave Room',
   },
   contextMenu: {

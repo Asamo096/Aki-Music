@@ -324,6 +324,9 @@ export default {
     followOwner: '自動跟隨房主播放',
     followHint:
       '開啟後會自動同步房主的播放/暫停/切歌與進度（落後超過 5 秒才對時）。',
+    ownerHint: '房間以你的播放為準：你播放/暫停/切歌時，成員會自動跟隨。',
+    memberHint:
+      '你正在跟隨房主的播放；網易只把成員操作推給官方用戶端的即時通道，因此房主不會跟隨你的操作。',
     leaveRoom: '退出房間',
   },
   contextMenu: {

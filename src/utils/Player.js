@@ -23,10 +23,7 @@ const INDEX_IN_PLAY_NEXT = -1;
  * @readonly
  * @enum {string}
  */
-const UNPLAYABLE_CONDITION = {
-  PLAY_NEXT_TRACK: 'playNextTrack',
-  PLAY_PREV_TRACK: 'playPrevTrack',
-};
+import { UNPLAYABLE_CONDITION } from '@/utils/playbackConditions';
 
 const ipcRenderer =
   process.env.IS_ELECTRON === true ? electronIpcRenderer : null;
@@ -556,6 +553,10 @@ export default class {
             break;
           case UNPLAYABLE_CONDITION.PLAY_PREV_TRACK:
             this.playPrevTrack();
+            break;
+          case UNPLAYABLE_CONDITION.STOP:
+            // 一起听：房间指定的歌本机放不了 → 停下并提示，保持与房间一致
+            this.pause();
             break;
           default:
             store.dispatch(

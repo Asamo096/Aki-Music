@@ -331,6 +331,10 @@ export default {
     followOwner: 'Sunucuyu otomatik izle',
     followHint:
       'Sunucunun oynat/duraklat/şarkı değişimi ve konumunu eşitler (yalnızca 5s üzeri kayma düzeltilir).',
+    ownerHint:
+      'Oda senin oynatmanı izler: üyeler oynat/duraklat/şarkı değişimlerini takip eder.',
+    memberHint:
+      'Sunucuyu takip ediyorsun; NetEase üye işlemlerini yalnızca resmi istemcinin gerçek zamanlı kanalına iter, bu yüzden sunucu seni takip etmez.',
     leaveRoom: 'Odadan Ayrıl',
   },
   contextMenu: {

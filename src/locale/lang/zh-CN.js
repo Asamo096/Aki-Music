@@ -327,6 +327,9 @@ export default {
     followOwner: '自动跟随房主播放',
     followHint:
       '开启后会自动同步房主的播放/暂停/切歌与进度（落后超过 5 秒才对时）。',
+    ownerHint: '房间以你的播放为准：你播放/暂停/切歌时，成员会自动跟随。',
+    memberHint:
+      '你正在跟随房主的播放；网易只把成员操作推给官方客户端的实时通道，因此房主不会跟随你的操作。',
     leaveRoom: '退出房间',
   },
   contextMenu: {

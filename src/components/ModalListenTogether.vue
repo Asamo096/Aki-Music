@@ -119,7 +119,7 @@
           <p v-else class="desc">{{ $t('listenTogether.noSong') }}</p>
         </div>
 
-        <div class="follow-row">
+        <div v-if="!isOwner" class="follow-row">
           <span>{{ $t('listenTogether.followOwner') }}</span>
           <div class="toggle">
             <input
@@ -132,7 +132,15 @@
           </div>
         </div>
 
-        <p class="hint">{{ $t('listenTogether.followHint') }}</p>
+        <!-- 同步方向是单向的（房主 → 成员）：成员的操作走网易云信实时通道，
+             本项目（以及官方客户端之外的实现）订阅不到，无法回传房主。 -->
+        <p class="hint">
+          {{
+            isOwner
+              ? $t('listenTogether.ownerHint')
+              : $t('listenTogether.memberHint')
+          }}
+        </p>
 
         <button class="leave-btn" @click="leaveRoom">
           {{ $t('listenTogether.leaveRoom') }}

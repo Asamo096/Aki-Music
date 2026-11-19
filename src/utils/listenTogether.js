@@ -30,6 +30,7 @@ import {
 } from '@/api/listenTogether';
 import { getTrackDetail } from '@/api/track';
 import { isAccountLoggedIn } from '@/utils/auth';
+import { UNPLAYABLE_CONDITION } from '@/utils/playbackConditions';
 import {
   buildPlayCommandSignature,
   parseListenTogetherShareLink,
@@ -89,6 +90,11 @@ class ListenTogetherService {
 
   _userId() {
     return store.state.data?.user?.userId ?? 0;
+  }
+
+  /** 本机是否为房主（房间以房主的播放为准） */
+  get isOwner() {
+    return this.inRoom && String(this._creatorId) === String(this._userId());
   }
 
   _commit(patch = {}) {
@@ -363,6 +369,10 @@ class ListenTogetherService {
    */
   async reportPlayCommand(commandType, options = {}) {
     if (!this.inRoom) return;
+    // 只有房主的指令能被其他成员通过 sync/playlist/get 读到；
+    // 成员的上报只会进 NIM（官方客户端的实时通道），本项目订阅不到，
+    // 因此成员不再上报，避免"看起来同步了其实没有"的误解（见计划书 M4 记录）。
+    if (!this.isOwner) return;
     const player = store.state.player;
     const targetSongId = options.targetSongId ?? player?.currentTrackID ?? '';
     if (!targetSongId) return;
@@ -526,7 +536,13 @@ class ListenTogetherService {
     if (cmd.targetSongId && cmd.targetSongId !== currentId) {
       this._remoteApplying = true;
       try {
-        await player._replaceCurrentTrack(cmd.targetSongId, true);
+        // 第三参 STOP：房间指定的歌本机放不了时**不要自动跳走**，
+        // 否则本地进度会偏离房间（VIP 曲目在未登录/无版权时会走到这里）
+        await player._replaceCurrentTrack(
+          cmd.targetSongId,
+          true,
+          UNPLAYABLE_CONDITION.STOP
+        );
       } catch (error) {
         console.debug('[listen-together] remote track failed', error);
       } finally {
@@ -569,7 +585,7 @@ class ListenTogetherService {
   /* ── 播放器钩子 ── */
 
   onTrackChange() {
-    if (!this.inRoom || this._remoteApplying) return;
+    if (!this.inRoom || !this.isOwner || this._remoteApplying) return;
     const trackId = store.state.player?.currentTrackID;
     if (trackId && trackId !== this._lastTrackId) {
       // 用户手动切歌：20 秒内不被远端强行拉回（参考实现的用户覆盖窗口）
@@ -583,17 +599,20 @@ class ListenTogetherService {
   }
 
   onPlay() {
-    if (!this.inRoom || Date.now() < this._remoteSuppressUntil) return;
+    if (!this.inRoom || !this.isOwner || Date.now() < this._remoteSuppressUntil)
+      return;
     this.reportPlayCommand('PLAY');
   }
 
   onPause() {
-    if (!this.inRoom || Date.now() < this._remoteSuppressUntil) return;
+    if (!this.inRoom || !this.isOwner || Date.now() < this._remoteSuppressUntil)
+      return;
     this.reportPlayCommand('PAUSE');
   }
 
   onSeek() {
-    if (!this.inRoom || Date.now() < this._remoteSuppressUntil) return;
+    if (!this.inRoom || !this.isOwner || Date.now() < this._remoteSuppressUntil)
+      return;
     this.reportPlayCommand('seek');
   }
 }
