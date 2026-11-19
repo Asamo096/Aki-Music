@@ -512,13 +512,15 @@ class ListenTogetherService {
           };
           if (player.shuffle) {
             // 随机模式下播放用的是 _shuffledList，只改 _list 不生效；
-            // 以当前歌曲为第一首重排，保证"下一首"仍落在共享歌单内
-            await player._shuffleTheList(
-              newList.includes(currentId) ? currentId : 'first'
-            );
+            // 以当前歌曲为首重排（当前歌不在歌单里时也会被临时放在首位），
+            // 下标固定为 0，避免沿用旧列表的随机下标导致"下一首"错位
+            await player._shuffleTheList(currentId);
+            player.current = 0;
+          } else {
+            const idx = player.list.indexOf(currentId);
+            // 当前歌不在共享歌单里时置 -1：下一首从歌单第一首开始
+            player.current = idx >= 0 ? idx : -1;
           }
-          const idx = player.list.indexOf(currentId);
-          if (idx >= 0) player.current = idx;
         }
         if (newList.length) {
           try {
