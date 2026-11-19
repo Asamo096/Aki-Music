@@ -43,6 +43,8 @@ const SEND_CHANNELS = [
   'lyrics-state',
   // 远程窗口 → 主进程的播放命令（M3-B）
   'remote-command',
+  // 远程窗口 → 主进程 → 主窗口：桌面歌词外观设置
+  'desktop-lyrics:settings',
 ];
 
 /** 渲染进程 → 主进程，需要返回值 */
@@ -57,6 +59,7 @@ const INVOKE_CHANNELS = [
   // 远程控制窗口（M3-B）
   'remote:toggle',
   'remote:click-through',
+  'remote:maximize',
 ];
 
 /** 主进程 → 渲染进程，事件订阅 */
@@ -86,6 +89,8 @@ const RECEIVE_CHANNELS = [
   'remote:click-through-state',
   // 主窗口接收远程控制窗口的播放命令（M3-B）
   'remote-command',
+  // 主窗口接收桌面歌词外观设置（面板在远程窗口里）
+  'desktop-lyrics:settings',
 ];
 
 const warn = (kind, channel) => {

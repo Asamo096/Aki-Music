@@ -228,11 +228,6 @@ export default {
     subTitleDefault: 'Show Alias for Subtitle by default',
     enableReversedMode: 'Enable Reversed Mode (Experimental)',
     enableCustomTitlebar: 'Enable custom title bar (Need restart)',
-    remote: {
-      toggle: 'Remote Control Window',
-      clickThrough: 'Click-through (let clicks pass through)',
-      close: 'Close remote control',
-    },
     desktopLyrics: {
       toggle: 'Desktop Lyrics (Wallpaper Layer)',
       errors: {
@@ -302,6 +297,25 @@ export default {
         desc2: 'Leave empty to pick up the default value',
       },
     },
+  },
+  remote: {
+    toggle: 'Remote Control Window',
+    clickThrough: 'Click-through (let clicks pass through)',
+    close: 'Close remote control',
+    maximize: 'Maximize',
+    restore: 'Restore',
+    desktopSettings: 'Desktop Lyrics Appearance',
+    desktopSettingsHint:
+      'Adjusts the desktop lyrics window (wallpaper layer)',
+    position: 'Position',
+    positionTop: 'Top',
+    positionCenter: 'Center',
+    positionBottom: 'Bottom',
+    font: 'Font',
+    followLyricsFont: 'Follow lyrics page',
+    size: 'Size',
+    color: 'Color',
+    colorAuto: 'Auto (cover color)',
   },
   contextMenu: {
     play: 'Play',

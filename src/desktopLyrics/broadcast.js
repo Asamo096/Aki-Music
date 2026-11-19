@@ -12,7 +12,11 @@
  * （见 shared/lyricsSnapshot.js 的 getSnapshotTime），500ms 心跳不会造成跳字。
  */
 import { ipcRenderer } from '@/utils/electronBridge';
-import { CHANNELS, STATE_INTERVAL_MS } from '@/shared/lyricsSnapshot';
+import {
+  CHANNELS,
+  STATE_INTERVAL_MS,
+  normalizeDesktopLyricsSettings,
+} from '@/shared/lyricsSnapshot';
 import { resolveLyricsFontFamily } from '@/settings/fontStacks';
 
 let stateTimer = null;
@@ -35,6 +39,22 @@ const available = () =>
 export const publishLyricsPayload = (trackId, data, settings, options = {}) => {
   if (!available()) return;
   payloadVersion += 1;
+
+  // 桌面歌词窗的外观（位置/字体/大小/颜色）：真值在 settings.desktopLyrics，
+  // 这里解析成可直接用的 CSS 值随快照下发，副窗口不需要自己读设置
+  const desktopSetting = normalizeDesktopLyricsSettings(
+    settings?.desktopLyrics
+  );
+  const desktopFontFamily =
+    desktopSetting.fontPreset === 'inherit'
+      ? resolveLyricsFontFamily(settings)
+      : resolveLyricsFontFamily({
+          lyricsFontPreset: desktopSetting.fontPreset,
+        });
+  const accent = options.accent || '';
+  const desktopColor =
+    desktopSetting.color === 'auto' ? '' : desktopSetting.color;
+
   ipcRenderer.send(CHANNELS.payload, {
     version: payloadVersion,
     trackId: trackId ?? null,
@@ -44,10 +64,18 @@ export const publishLyricsPayload = (trackId, data, settings, options = {}) => {
     format: data?.format ?? null,
     track: options.track ?? null,
     style: {
+      // 歌词页（远程窗口复用这套）
       fontFamily: resolveLyricsFontFamily(settings),
       fontSize: settings?.lyricFontSize || 28,
       secondary: options.secondary || 'translation',
-      accent: options.accent || '',
+      accent,
+      // 桌面歌词窗（壁纸层）：原始设置 + 解析后的 CSS 值
+      desktop: {
+        ...desktopSetting,
+        fontFamily: desktopFontFamily,
+        colorHex: desktopColor,
+        sweep: desktopColor || accent,
+      },
     },
   });
 };

@@ -24,6 +24,7 @@ import { BrowserWindow, ipcMain, screen } from 'electron';
 import {
   CHANNELS,
   CLICK_THROUGH_POLL_MS,
+  normalizeDesktopLyricsSettings,
   WINDOW_QUERY_KEY,
   WINDOW_REMOTE,
   isInUnlockHotspot,
@@ -36,6 +37,8 @@ const WINDOW_HEIGHT = 230;
 const MARGIN = 24;
 
 let win = null;
+/** 紧凑尺寸（默认）与最大化时的窗口尺寸 */
+let maximized = false;
 let clickThroughEnabled = false;
 let hotspotPolling = null;
 let unlockHover = false;
@@ -50,9 +53,15 @@ const status = () => ({
   open: Boolean(win && !win.isDestroyed()),
   clickThrough: clickThroughEnabled,
   unlockHover,
+  maximized,
 });
 
-const emitStatus = () => reportStatus(status());
+const emitStatus = () => {
+  const snapshot = status();
+  reportStatus(snapshot);
+  // 自己也收一份：最大化状态由主进程持有，页面据此回显按钮
+  pushToRemote(CHANNELS.remoteStatus, snapshot);
+};
 
 const loadUrl = () => {
   const base = process.env.VITE_DEV_SERVER_URL || 'http://localhost:27232';
@@ -138,6 +147,7 @@ const shutdown = () => {
   stopHotspotPolling();
   clickThroughEnabled = false;
   unlockHover = false;
+  maximized = false;
   const current = win;
   win = null;
   if (current && !current.isDestroyed()) current.destroy();
@@ -154,15 +164,15 @@ export const openRemote = async ({ preload }) => {
 
   clickThroughEnabled = false;
   unlockHover = false;
+  maximized = false;
 
-  const display = screen.getPrimaryDisplay();
-  const { workArea } = display;
+  const initial = compactBounds();
 
   win = new BrowserWindow({
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
-    x: workArea.x + workArea.width - WINDOW_WIDTH - MARGIN,
-    y: workArea.y + workArea.height - WINDOW_HEIGHT - MARGIN,
+    width: initial.width,
+    height: initial.height,
+    x: initial.x,
+    y: initial.y,
     frame: false,
     transparent: true,
     hasShadow: false,
@@ -209,6 +219,44 @@ export const closeRemote = () => {
   shutdown();
 };
 
+const compactBounds = () => {
+  const display = screen.getPrimaryDisplay();
+  const { workArea } = display;
+  return {
+    x: workArea.x + workArea.width - WINDOW_WIDTH - MARGIN,
+    y: workArea.y + workArea.height - WINDOW_HEIGHT - MARGIN,
+    width: WINDOW_WIDTH,
+    height: WINDOW_HEIGHT,
+  };
+};
+
+const expandedBounds = () => {
+  // 用窗口当前所在显示器：最大化跟着窗口走，而不是永远回主屏
+  const display = win
+    ? screen.getDisplayMatching(win.getBounds())
+    : screen.getPrimaryDisplay();
+  const { workArea } = display;
+  return {
+    x: workArea.x + MARGIN,
+    y: workArea.y + MARGIN,
+    width: Math.max(WINDOW_WIDTH, workArea.width - MARGIN * 2),
+    height: Math.max(WINDOW_HEIGHT, workArea.height - MARGIN * 2),
+  };
+};
+
+/**
+ * 最大化 / 还原。
+ * 不用 win.maximize()：无边框透明窗口在 Windows 上最大化会丢掉圆角与阴影表现，
+ * 而且会变成"全屏"而不是"留边"；这里直接按工作区改 bounds，行为可预期。
+ */
+export const toggleRemoteMaximize = () => {
+  if (!isRemoteOpen()) return { ok: false, status: status() };
+  maximized = !maximized;
+  win.setBounds(maximized ? expandedBounds() : compactBounds(), false);
+  emitStatus();
+  return { ok: true, maximized, status: status() };
+};
+
 /**
  * 切换点击穿透。
  * @returns {{ok:boolean, status:object}}
@@ -251,6 +299,24 @@ export const initRemoteIpc = ({ mainWindow, preload }) => {
   });
 
   // 远程窗口 → 主进程 → 主窗口（播放命令）
+  ipcMain.handle(CHANNELS.remoteMaximize, event => {
+    const allowed =
+      isMain(event) ||
+      (win && !win.isDestroyed() && event.sender === win.webContents);
+    if (!allowed) return { ok: false, reason: 'forbidden' };
+    return toggleRemoteMaximize();
+  });
+
+  // 桌面歌词外观设置：远程窗口 → 主窗口（真值在 settings.desktopLyrics）
+  ipcMain.on(CHANNELS.desktopSettings, (event, patch) => {
+    if (!win || win.isDestroyed() || event.sender !== win.webContents) return;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send(
+      CHANNELS.desktopSettings,
+      normalizeDesktopLyricsSettings(patch)
+    );
+  });
+
   ipcMain.on(CHANNELS.remoteCommand, (event, command) => {
     if (!win || win.isDestroyed() || event.sender !== win.webContents) return;
     if (!mainWindow || mainWindow.isDestroyed()) return;

@@ -19,6 +19,14 @@ let localStorage = {
     // 'app' = 沿用应用自带 Barlow（默认，观感与改造前完全一致）
     lyricsFontPreset: 'app',
     lyricsFontFamily: null,
+    // 桌面歌词窗（壁纸层）的外观：由远程控制窗口的"齿轮"面板调节。
+    // 真值保存在主窗口的设置里，副窗口只按 IPC 下发的快照渲染。
+    desktopLyrics: {
+      position: 'center',
+      fontPreset: 'inherit',
+      fontSize: 32,
+      color: 'auto',
+    },
     outputDevice: 'default',
     showPlaylistsByAppleMusic: true,
     enableUnblockNeteaseMusic: true,

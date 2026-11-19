@@ -232,11 +232,6 @@ export default {
       new: '新',
       cost: { low: '低开销', medium: '中开销', high: '高开销' },
     },
-    remote: {
-      toggle: '远程控制窗口',
-      clickThrough: '点击穿透（鼠标穿过窗口）',
-      close: '关闭远程控制',
-    },
     desktopLyrics: {
       toggle: '桌面歌词（壁纸层）',
       errors: {
@@ -291,6 +286,24 @@ export default {
         desc2: '留空则不进行相关设置',
       },
     },
+  },
+  remote: {
+    toggle: '远程控制窗口',
+    clickThrough: '点击穿透（鼠标穿过窗口）',
+    close: '关闭远程控制',
+    maximize: '最大化',
+    restore: '还原',
+    desktopSettings: '桌面歌词外观',
+    desktopSettingsHint: '调整的是桌面歌词窗（壁纸层）',
+    position: '位置',
+    positionTop: '顶部',
+    positionCenter: '居中',
+    positionBottom: '底部',
+    font: '字体',
+    followLyricsFont: '跟随歌词页',
+    size: '大小',
+    color: '颜色',
+    colorAuto: '自动（封面主色）',
   },
   contextMenu: {
     play: '播放',

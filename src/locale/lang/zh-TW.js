@@ -219,11 +219,6 @@ export default {
     subTitleDefault: '副標題使用別名',
     enableReversedMode: '啟用倒序播放功能 (實驗性功能)',
     enableCustomTitlebar: '啟用自訂標題列（重新啟動後生效）',
-    remote: {
-      toggle: '遠端控制視窗',
-      clickThrough: '點擊穿透（滑鼠穿過視窗）',
-      close: '關閉遠端控制',
-    },
     desktopLyrics: {
       toggle: '桌面歌詞（桌布層）',
       errors: {
@@ -288,6 +283,24 @@ export default {
         desc2: '留空則不進行相關設定',
       },
     },
+  },
+  remote: {
+    toggle: '遠端控制視窗',
+    clickThrough: '點擊穿透（滑鼠穿過視窗）',
+    close: '關閉遠端控制',
+    maximize: '最大化',
+    restore: '還原',
+    desktopSettings: '桌面歌詞外觀',
+    desktopSettingsHint: '調整的是桌面歌詞視窗（桌布層）',
+    position: '位置',
+    positionTop: '頂部',
+    positionCenter: '置中',
+    positionBottom: '底部',
+    font: '字體',
+    followLyricsFont: '跟隨歌詞頁',
+    size: '大小',
+    color: '顏色',
+    colorAuto: '自動（封面主色）',
   },
   contextMenu: {
     play: '播放',

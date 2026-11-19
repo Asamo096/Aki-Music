@@ -235,11 +235,6 @@ export default {
         high: 'Yüksek Maliyet',
       },
     },
-    remote: {
-      toggle: 'Uzak Masaüstü Kontrol Penceresi',
-      clickThrough: 'Tıklamayı geçir (tıklamalar pencereden geçsin)',
-      close: 'Uzak kontrolü kapat',
-    },
     desktopLyrics: {
       toggle: 'Masaüstü Şarkı Sözleri (Duvar Kağıdı Katmanı)',
       errors: {
@@ -292,6 +287,25 @@ export default {
         desc2: 'Leave empty to pick up the default value',
       },
     },
+  },
+  remote: {
+    toggle: 'Uzak Masaüstü Kontrol Penceresi',
+    clickThrough: 'Tıklamayı geçir (tıklamalar pencereden geçsin)',
+    close: 'Uzak kontrolü kapat',
+    maximize: 'Büyüt',
+    restore: 'Geri Yükle',
+    desktopSettings: 'Masaüstü Şarkı Sözü Görünümü',
+    desktopSettingsHint:
+      'Masaüstü şarkı sözleri penceresini ayarlar (duvar kağıdı katmanı)',
+    position: 'Konum',
+    positionTop: 'Üst',
+    positionCenter: 'Orta',
+    positionBottom: 'Alt',
+    font: 'Yazı Tipi',
+    followLyricsFont: 'Şarkı sözü sayfasını izle',
+    size: 'Boyut',
+    color: 'Renk',
+    colorAuto: 'Otomatik (kapak rengi)',
   },
   contextMenu: {
     play: 'Oynat',

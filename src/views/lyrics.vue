@@ -365,7 +365,10 @@ import {
   isDarkBackgroundStyle,
 } from '@/settings/lyricBackground';
 import { publishLyricsPayload } from '@/desktopLyrics/broadcast';
-import { CHANNELS } from '@/shared/lyricsSnapshot';
+import {
+  CHANNELS,
+  normalizeDesktopLyricsSettings,
+} from '@/shared/lyricsSnapshot';
 import ButtonIcon from '@/components/ButtonIcon.vue';
 import * as Vibrant from 'node-vibrant/dist/vibrant.worker.min.js';
 import Color from 'color';
@@ -550,6 +553,14 @@ export default {
       ipcRenderer.on(CHANNELS.remoteStatus, (_event, status) => {
         this.remoteOpen = Boolean(status?.open);
       });
+      // 远程窗口的齿轮面板改的是桌面歌词外观：真值落在这里（主窗口）的 settings，
+      // 落库后由下方 watch 触发快照重发，两个副窗口随之更新
+      ipcRenderer.on(CHANNELS.desktopSettings, (_event, patch) => {
+        this.$store.commit('updateSettings', {
+          key: 'desktopLyrics',
+          value: normalizeDesktopLyricsSettings(patch),
+        });
+      });
     }
     // 样式变化（字体/字号/翻译/主题色）后重发一次快照，副窗口跟随
     this.$watch(
@@ -560,6 +571,7 @@ export default {
         this.settings.showLyricsTranslation,
         this.lyricType,
         this.coverAccent,
+        this.settings.desktopLyrics,
       ],
       () => this.publishLyricsSnapshot()
     );

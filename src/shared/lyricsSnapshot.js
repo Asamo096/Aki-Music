@@ -32,6 +32,57 @@ export const CHANNELS = {
   remoteStatus: 'remote:status',
   /** 渲染进程（远程窗口）→ 主进程：点击穿透开关（INVOKE） */
   remoteClickThrough: 'remote:click-through',
+  /** 渲染进程（远程窗口）→ 主进程：最大化/还原（INVOKE） */
+  remoteMaximize: 'remote:maximize',
+  /** 渲染进程（远程窗口）→ 主进程 → 主窗口：桌面歌词的外观设置 */
+  desktopSettings: 'desktop-lyrics:settings',
+};
+
+/* ── 桌面歌词窗的外观设置（由远程窗口的"齿轮"面板修改，主窗口持有真值）── */
+
+export const DESKTOP_LYRICS_POSITIONS = ['top', 'center', 'bottom'];
+/** inherit = 跟随歌词页的字体设置 */
+export const DESKTOP_LYRICS_FONT_PRESETS = [
+  'inherit',
+  'app',
+  'sans',
+  'serif',
+  'mono',
+];
+
+export const DESKTOP_LYRICS_DEFAULTS = {
+  position: 'center',
+  fontPreset: 'inherit',
+  fontSize: 32,
+  /** 'auto' = 用封面主色；否则是 #rrggbb */
+  color: 'auto',
+};
+
+const clampFontSize = value => {
+  const size = Number(value);
+  if (!Number.isFinite(size)) return DESKTOP_LYRICS_DEFAULTS.fontSize;
+  return Math.min(72, Math.max(16, Math.round(size / 2) * 2));
+};
+
+const normalizeColor = value => {
+  if (typeof value !== 'string') return DESKTOP_LYRICS_DEFAULTS.color;
+  if (value === 'auto') return 'auto';
+  return /^#[0-9a-f]{6}$/i.test(value) ? value : DESKTOP_LYRICS_DEFAULTS.color;
+};
+
+/** 逐字段校验：IPC 数据不可信，任何脏值都回落到默认值 */
+export const normalizeDesktopLyricsSettings = (value = {}) => {
+  const source = value && typeof value === 'object' ? value : {};
+  return {
+    position: DESKTOP_LYRICS_POSITIONS.includes(source.position)
+      ? source.position
+      : DESKTOP_LYRICS_DEFAULTS.position,
+    fontPreset: DESKTOP_LYRICS_FONT_PRESETS.includes(source.fontPreset)
+      ? source.fontPreset
+      : DESKTOP_LYRICS_DEFAULTS.fontPreset,
+    fontSize: clampFontSize(source.fontSize),
+    color: normalizeColor(source.color),
+  };
 };
 
 /**

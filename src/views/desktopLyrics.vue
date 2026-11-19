@@ -1,6 +1,6 @@
 <template>
   <div class="desktop-lyrics" :style="rootStyle">
-    <div class="lyrics-viewport">
+    <div class="lyrics-band" :class="`position-${position}`">
       <LyricLines
         :lines="lines"
         :active-index="activeIndex"
@@ -34,6 +34,7 @@ import {
   getSnapshotTime,
   isPayloadValid,
   isStateValid,
+  normalizeDesktopLyricsSettings,
 } from '@/shared/lyricsSnapshot';
 import { findActiveLineIndex } from '@/lyrics/timing/activeLine';
 
@@ -64,14 +65,26 @@ export default {
     secondary() {
       return this.payload?.style?.secondary || 'none';
     },
+    /** 桌面歌词外观（由远程窗口的齿轮面板修改，主窗口持有真值） */
+    desktopStyle() {
+      return normalizeDesktopLyricsSettings(this.payload?.style?.desktop);
+    },
+    position() {
+      return this.desktopStyle.position;
+    },
     rootStyle() {
       const style = this.payload?.style || {};
+      const desktop = style.desktop || {};
       return {
-        fontFamily: style.fontFamily || undefined,
-        fontSize: style.fontSize ? `${style.fontSize}px` : undefined,
-        '--lyric-accent': style.accent || null,
-        // 压在任意壁纸上都要看得清：文字阴影由本页注入
+        fontFamily: desktop.fontFamily || style.fontFamily || undefined,
+        fontSize: desktop.fontSize ? `${desktop.fontSize}px` : undefined,
+        // 颜色：'auto' 时用封面主色（sweep），正文保持默认白
+        color: desktop.colorHex || undefined,
+        '--lyric-accent': desktop.sweep || style.accent || null,
+        // 压在任意壁纸上都要看得清
         '--lyric-text-shadow': '0 2px 10px rgba(0, 0, 0, 0.82)',
+        // 歌词带内部留白：视口高度由 CSS 固定，这里给一半
+        '--lyric-spacer': '17vh',
       };
     },
   },
@@ -138,22 +151,44 @@ export default {
   position: fixed;
   inset: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   // 完全透明：背景由桌面本身提供
   background: transparent;
   overflow: hidden;
   user-select: none;
 
-  .lyrics-viewport {
-    width: min(78vw, 1100px);
-    height: 100%;
+  // 歌词带：只占屏幕的一条区域，位置由"齿轮 → 位置"决定。
+  // 桌面歌词在壁纸层铺满整屏，必须靠这条带子控制文字落在哪里。
+  .lyrics-band {
+    width: min(92vw, 1500px);
+    height: 34vh;
+    margin: 0 auto;
     // 隐藏滚动条；LyricLines 会用 scrollIntoView 把当前行居中
     overflow: hidden;
     scrollbar-width: none;
 
     &::-webkit-scrollbar {
       display: none;
+    }
+
+    &.position-top {
+      margin-top: 8vh;
+    }
+
+    &.position-center {
+      margin-top: auto;
+      margin-bottom: auto;
+    }
+
+    &.position-bottom {
+      margin-top: auto;
+      margin-bottom: 8vh;
+    }
+
+    // 桌面歌词按居中排版（壁纸层是整屏宽，左对齐会贴到屏幕边缘）
+    ::v-deep .lyric-lines .line .content {
+      text-align: center;
+      transform-origin: center center;
     }
   }
 }

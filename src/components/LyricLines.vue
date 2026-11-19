@@ -119,11 +119,21 @@ export default {
   mounted() {
     this.scheduleSync();
     this.rafId = requestAnimationFrame(this.tick);
+    // 视口尺寸变化（副窗口最大化/还原、主窗口缩放）后要重新居中当前行，
+    // 否则会保留旧的 scrollTop，当前行被顶到边缘甚至被裁掉。
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => this.scheduleSync());
+      this.resizeObserver.observe(this.$el);
+    }
   },
   beforeDestroy() {
     if (this.rafId) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
+    }
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
     }
     this.detachScrollListeners();
   },
@@ -299,9 +309,10 @@ export default {
     }
   }
 
-  /* 上下留白：让首/末行也能滚到屏幕中间（原来是 margin-top/height 50vh） */
+  /* 上下留白：让首/末行也能滚到视口中间。默认按整屏（50vh），
+     副窗口（远程控制/桌面歌词）视口小得多，用 --lyric-spacer 覆盖。 */
   .line.spacer {
-    height: 50vh;
+    height: var(--lyric-spacer, 50vh);
     margin: 0;
     padding: 0;
     flex-shrink: 0;
