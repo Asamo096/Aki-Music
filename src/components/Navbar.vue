@@ -66,7 +66,7 @@
         {{ $t('library.userProfileMenu.logout') }}
       </div>
       <hr />
-      <div class="item" v-if="repoUrl" @click="toGitHub">
+      <div v-if="repoUrl" class="item" @click="toGitHub">
         <svg-icon icon-class="github" />
         {{ $t('nav.github') }}
       </div>

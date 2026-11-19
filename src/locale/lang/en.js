@@ -301,7 +301,8 @@ export default {
   remote: {
     toggle: 'Remote Control Window',
     clickThrough: 'Click-through (let clicks pass through)',
-    clickThroughHint: 'Click-through is on: move the cursor to the top-right controls to interact',
+    clickThroughHint:
+      'Click-through is on: move the cursor to the top-right controls to interact',
     close: 'Close remote control',
     maximize: 'Maximize',
     restore: 'Restore',

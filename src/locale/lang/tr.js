@@ -291,7 +291,8 @@ export default {
   remote: {
     toggle: 'Uzak Masaüstü Kontrol Penceresi',
     clickThrough: 'Tıklamayı geçir (tıklamalar pencereden geçsin)',
-    clickThroughHint: 'Tıklamayı geçir açık: işlem yapmak için imleci sağ üstteki kontrollere getirin',
+    clickThroughHint:
+      'Tıklamayı geçir açık: işlem yapmak için imleci sağ üstteki kontrollere getirin',
     close: 'Uzak kontrolü kapat',
     maximize: 'Büyüt',
     restore: 'Geri Yükle',

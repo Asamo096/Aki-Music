@@ -81,6 +81,13 @@ export default {
       simiMvs: [],
     };
   },
+  watch: {
+    // 同路由仅参数变化时组件会被复用、created() 不再执行（见 playlist.vue 的说明）。
+    // 这里只需重新取数据，播放器实例无需重建。
+    '$route.params.id'(id) {
+      if (id) this.getData(id);
+    },
+  },
   mounted() {
     let videoOptions = {
       settings: ['quality'],
@@ -98,13 +105,6 @@ export default {
     });
     this.getData(this.$route.params.id);
     console.log('网易云你这mv音频码率也太糊了吧🙄');
-  },
-  watch: {
-    // 同路由仅参数变化时组件会被复用、created() 不再执行（见 playlist.vue 的说明）。
-    // 这里只需重新取数据，播放器实例无需重建。
-    '$route.params.id'(id) {
-      if (id) this.getData(id);
-    },
   },
   methods: {
     ...mapActions(['showToast']),
