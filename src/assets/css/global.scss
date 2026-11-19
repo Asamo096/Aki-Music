@@ -151,3 +151,10 @@ html.is-remote-control body {
   background: transparent !important;
   overflow: hidden;
 }
+
+/* 副窗口是暗色卡片：声明 color-scheme 后，原生控件（select 弹层、取色器、
+   滚动条）才会按深色渲染。之前 select 弹层是白底，配白色文字等于看不见选项。 */
+html.is-remote-control,
+html.is-desktop-lyrics {
+  color-scheme: dark;
+}

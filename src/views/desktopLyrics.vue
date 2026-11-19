@@ -76,7 +76,7 @@ export default {
       const style = this.payload?.style || {};
       const desktop = style.desktop || {};
       return {
-        fontFamily: desktop.fontFamily || style.fontFamily || undefined,
+        fontFamily: desktop.resolvedFamily || style.fontFamily || undefined,
         fontSize: desktop.fontSize ? `${desktop.fontSize}px` : undefined,
         // 颜色：'auto' 时用封面主色（sweep），正文保持默认白
         color: desktop.colorHex || undefined,

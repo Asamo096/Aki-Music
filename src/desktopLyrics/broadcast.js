@@ -50,6 +50,8 @@ export const publishLyricsPayload = (trackId, data, settings, options = {}) => {
       ? resolveLyricsFontFamily(settings)
       : resolveLyricsFontFamily({
           lyricsFontPreset: desktopSetting.fontPreset,
+          // custom 时 fontFamily 承载本机字体名，必须一起传进去
+          lyricsFontFamily: desktopSetting.fontFamily,
         });
   const accent = options.accent || '';
   const desktopColor =
@@ -71,8 +73,10 @@ export const publishLyricsPayload = (trackId, data, settings, options = {}) => {
       accent,
       // 桌面歌词窗（壁纸层）：原始设置 + 解析后的 CSS 值
       desktop: {
+        // 原始设置（面板回显与 patch 都基于它：fontFamily 是"字体名"）
         ...desktopSetting,
-        fontFamily: desktopFontFamily,
+        // 解析后的 CSS 字体栈（桌面歌词页直接用这个）
+        resolvedFamily: desktopFontFamily,
         colorHex: desktopColor,
         sweep: desktopColor || accent,
       },

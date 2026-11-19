@@ -48,11 +48,15 @@ export const DESKTOP_LYRICS_FONT_PRESETS = [
   'sans',
   'serif',
   'mono',
+  /** 指定某个本机字体（family 字段承载字体名） */
+  'custom',
 ];
 
 export const DESKTOP_LYRICS_DEFAULTS = {
   position: 'center',
   fontPreset: 'inherit',
+  /** fontPreset === 'custom' 时使用的字体族名 */
+  fontFamily: null,
   fontSize: 32,
   /** 'auto' = 用封面主色；否则是 #rrggbb */
   color: 'auto',
@@ -80,6 +84,10 @@ export const normalizeDesktopLyricsSettings = (value = {}) => {
     fontPreset: DESKTOP_LYRICS_FONT_PRESETS.includes(source.fontPreset)
       ? source.fontPreset
       : DESKTOP_LYRICS_DEFAULTS.fontPreset,
+    fontFamily:
+      typeof source.fontFamily === 'string' && source.fontFamily.trim()
+        ? source.fontFamily.trim()
+        : null,
     fontSize: clampFontSize(source.fontSize),
     color: normalizeColor(source.color),
   };

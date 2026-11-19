@@ -84,26 +84,73 @@
 
         <div class="row">
           <span class="label">{{ $t('remote.font') }}</span>
-          <select
-            :value="desktopSetting.fontPreset"
-            @change="sendDesktopSetting({ fontPreset: $event.target.value })"
+          <button class="font-current" @click="fontListOpen = !fontListOpen">
+            <span class="font-current-name" :style="fontPreviewStyle">{{
+              currentFontLabel
+            }}</span>
+            <svg-icon icon-class="dropdown" />
+          </button>
+        </div>
+
+        <!-- 字体列表：预设 + 本机字体。
+             原生 select 的弹层在暗色窗里是白底白字，改为自绘列表 -->
+        <div v-if="fontListOpen" class="font-list">
+          <button
+            v-for="preset in fontPresets"
+            :key="preset.value"
+            class="font-item"
+            :class="{ active: isPresetActive(preset.value) }"
+            :style="preset.preview ? { fontFamily: preset.preview } : null"
+            @click="chooseFontPreset(preset.value)"
           >
-            <option value="inherit">
-              {{ $t('remote.followLyricsFont') }}
-            </option>
-            <option value="app">
-              {{ $t('settings.lyricsFont.presetLabels.app') }}
-            </option>
-            <option value="sans">
-              {{ $t('settings.lyricsFont.presetLabels.sans') }}
-            </option>
-            <option value="serif">
-              {{ $t('settings.lyricsFont.presetLabels.serif') }}
-            </option>
-            <option value="mono">
-              {{ $t('settings.lyricsFont.presetLabels.mono') }}
-            </option>
-          </select>
+            {{ $t(preset.labelKey) }}
+          </button>
+
+          <div class="font-list-divider">
+            <span>{{ $t('settings.lyricsFont.system') }}</span>
+            <button
+              class="font-load"
+              :disabled="fontLoading"
+              @click="loadSystemFonts"
+            >
+              {{
+                fontLoading
+                  ? $t('settings.lyricsFont.loading')
+                  : $t('settings.lyricsFont.loadSystem')
+              }}
+            </button>
+          </div>
+
+          <input
+            v-model="fontSearch"
+            class="font-search"
+            type="text"
+            :placeholder="$t('settings.lyricsFont.search')"
+            @focus="loadSystemFonts"
+          />
+
+          <div v-if="fontError" class="font-error">{{ fontError }}</div>
+          <template v-else>
+            <button
+              v-for="font in filteredSystemFonts"
+              :key="font.family"
+              class="font-item"
+              :class="{
+                active: isCustomFontActive(font.family),
+                unavailable: font.unavailable,
+              }"
+              :style="{ fontFamily: font.cssFamily }"
+              @click="chooseSystemFont(font)"
+            >
+              {{ font.family }}
+            </button>
+            <div
+              v-if="systemFontsLoaded && filteredSystemFonts.length === 0"
+              class="font-empty"
+            >
+              {{ $t('settings.lyricsFont.empty') }}
+            </div>
+          </template>
         </div>
 
         <div class="row">
@@ -217,6 +264,7 @@ import {
   normalizeDesktopLyricsSettings,
 } from '@/shared/lyricsSnapshot';
 import { findActiveLineIndex } from '@/lyrics/timing/activeLine';
+import { isFontFamilyAvailableCached } from '@/settings/fontAvailability';
 
 const TICK_MS = 50;
 /** 紧凑模式下歌词区高度约 52px：上下留白各一半，首/末行也能居中 */
@@ -242,6 +290,13 @@ export default {
       /** 光标当前是否在热区内（渲染进程侧判定，用于即时解锁） */
       pointerInHotspot: false,
       clickThroughHint: false,
+      /** 字体列表（自绘，替换原生 select） */
+      fontListOpen: false,
+      fontSearch: '',
+      systemFonts: [],
+      systemFontsLoaded: false,
+      fontLoading: false,
+      fontError: '',
       hintTimer: null,
       hotspotObserver: null,
       tickTimer: null,
@@ -263,6 +318,60 @@ export default {
     /** 桌面歌词窗当前外观（面板回显用；快照是唯一真值来源） */
     desktopSetting() {
       return normalizeDesktopLyricsSettings(this.payload?.style?.desktop);
+    },
+    /** 面板里显示的当前字体名 */
+    currentFontLabel() {
+      const setting = this.desktopSetting;
+      if (setting.fontPreset === 'inherit') {
+        return this.$t('remote.followLyricsFont');
+      }
+      if (setting.fontPreset === 'custom') {
+        return setting.fontFamily || this.$t('settings.lyricsFont.notChosen');
+      }
+      return this.$t(`settings.lyricsFont.presetLabels.${setting.fontPreset}`);
+    },
+    /** 当前字体的预览样式：按钮上就把字体画出来 */
+    fontPreviewStyle() {
+      const stack = this.payload?.style?.desktop?.resolvedFamily;
+      if (!stack) return null;
+      // 只取栈首字体画预览；custom 时就是用户选的字体本身
+      return { fontFamily: stack.split(',')[0].trim() };
+    },
+    fontPresets() {
+      return [
+        {
+          value: 'inherit',
+          labelKey: 'remote.followLyricsFont',
+          preview: null,
+        },
+        {
+          value: 'app',
+          labelKey: 'settings.lyricsFont.presetLabels.app',
+          preview: 'Barlow, sans-serif',
+        },
+        {
+          value: 'sans',
+          labelKey: 'settings.lyricsFont.presetLabels.sans',
+          preview: 'Inter, "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+        },
+        {
+          value: 'serif',
+          labelKey: 'settings.lyricsFont.presetLabels.serif',
+          preview: '"Iowan Old Style", "Noto Serif CJK SC", "Songti SC", serif',
+        },
+        {
+          value: 'mono',
+          labelKey: 'settings.lyricsFont.presetLabels.mono',
+          preview: '"Sarasa Mono SC", Consolas, monospace',
+        },
+      ];
+    },
+    filteredSystemFonts() {
+      const query = this.fontSearch.trim().toLocaleLowerCase();
+      if (!query) return this.systemFonts;
+      return this.systemFonts.filter(font =>
+        font.family.toLocaleLowerCase().includes(query)
+      );
     },
     positionOptions() {
       return [
@@ -366,6 +475,66 @@ export default {
         if (snapshot?.state) this.state = snapshot.state;
       } catch (error) {
         console.warn('[remote] 获取初始快照失败', error);
+      }
+    },
+    isPresetActive(preset) {
+      return this.desktopSetting.fontPreset === preset;
+    },
+    isCustomFontActive(family) {
+      return (
+        this.desktopSetting.fontPreset === 'custom' &&
+        this.desktopSetting.fontFamily === family
+      );
+    },
+    chooseFontPreset(preset) {
+      this.fontListOpen = false;
+      this.sendDesktopSetting({ fontPreset: preset, fontFamily: null });
+    },
+    chooseSystemFont(font) {
+      this.fontListOpen = false;
+      this.sendDesktopSetting({
+        fontPreset: 'custom',
+        fontFamily: font.family,
+      });
+    },
+    /** 读取本机字体（Local Font Access；远程窗是可见窗口，满足 API 的可见性要求） */
+    async loadSystemFonts() {
+      if (this.fontLoading || this.systemFontsLoaded) return;
+      const queryLocalFonts =
+        typeof window.queryLocalFonts === 'function'
+          ? window.queryLocalFonts.bind(window)
+          : null;
+      if (!queryLocalFonts) {
+        this.fontError = this.$t('settings.lyricsFont.unsupported');
+        this.systemFontsLoaded = true;
+        return;
+      }
+      this.fontLoading = true;
+      this.fontError = '';
+      try {
+        const list = await queryLocalFonts();
+        const seen = new Map();
+        for (const item of list) {
+          const family = (item.family || '').trim();
+          if (!family) continue;
+          const key = family.toLocaleLowerCase();
+          if (seen.has(key)) continue;
+          seen.set(key, {
+            family,
+            cssFamily: `"${family.replace(/["\\]/g, '\\$&')}"`,
+            unavailable: !isFontFamilyAvailableCached(family),
+          });
+        }
+        this.systemFonts = [...seen.values()].sort((a, b) =>
+          a.family.localeCompare(b.family)
+        );
+        this.systemFontsLoaded = true;
+      } catch (error) {
+        console.warn('[remote] queryLocalFonts 失败', error);
+        this.fontError = this.$t('settings.lyricsFont.permissionDenied');
+        this.systemFontsLoaded = true;
+      } finally {
+        this.fontLoading = false;
       }
     },
     /**
@@ -499,6 +668,7 @@ export default {
 }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -597,14 +767,22 @@ export default {
 
 /* ── 齿轮面板：桌面歌词外观 ── */
 .settings-panel {
-  margin: 2px 10px 6px;
-  // 紧凑窗只有 230px 高：面板内容超出时可滚动，不能被裁成点不到
-  max-height: calc(100% - 96px);
+  // 紧凑窗只有 230px 高：面板改为覆盖整个卡片主体（绝对定位），
+  // 内部滚动，否则带上百个系统字体的列表会被裁成不可点。
+  position: absolute;
+  top: 44px;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 5;
+  margin: 0;
   overflow-y: auto;
   scrollbar-width: thin;
   padding: 8px 10px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  // 覆盖在卡片主体上：必须不透明，否则背后的歌词会透出来
+  background: #22242b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   -webkit-app-region: no-drag;
   font-size: 12px;
 
@@ -645,16 +823,121 @@ export default {
     }
   }
 
-  select {
-    max-width: 130px;
-    padding: 2px 4px;
+  /* 当前字体：自绘按钮（替换原生 select，避免白底白字的弹层） */
+  .font-current {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 190px;
+    padding: 3px 8px;
     border: none;
     border-radius: 6px;
-    font-size: 12px;
     font-family: inherit;
+    font-size: 12px;
     color: inherit;
+    cursor: pointer;
     background: rgba(255, 255, 255, 0.1);
-    outline: none;
+
+    .font-current-name {
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .svg-icon {
+      width: 10px;
+      height: 10px;
+      opacity: 0.6;
+    }
+  }
+
+  /* 字体列表：预设 + 本机字体 */
+  .font-list {
+    margin-top: 2px;
+    max-height: 190px;
+    overflow-y: auto;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.22);
+    scrollbar-width: thin;
+
+    .font-item {
+      display: block;
+      width: 100%;
+      padding: 4px 9px;
+      border: none;
+      border-radius: 0;
+      text-align: left;
+      font-size: 12px;
+      font-family: inherit;
+      color: inherit;
+      cursor: pointer;
+      background: transparent;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      &.active {
+        background: rgba(120, 170, 255, 0.4);
+      }
+
+      &.unavailable {
+        opacity: 0.45;
+      }
+    }
+
+    .font-list-divider {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+      padding: 4px 9px 2px;
+      font-size: 11px;
+      opacity: 0.6;
+
+      .font-load {
+        padding: 1px 6px;
+        border: none;
+        border-radius: 5px;
+        font-size: 11px;
+        font-family: inherit;
+        color: inherit;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.1);
+
+        &:disabled {
+          opacity: 0.5;
+          cursor: default;
+        }
+      }
+    }
+
+    .font-search {
+      width: calc(100% - 18px);
+      margin: 4px 9px 2px;
+      padding: 3px 7px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: inherit;
+      color: inherit;
+      background: rgba(255, 255, 255, 0.1);
+      outline: none;
+
+      &::placeholder {
+        color: inherit;
+        opacity: 0.45;
+      }
+    }
+
+    .font-error,
+    .font-empty {
+      padding: 6px 9px;
+      font-size: 11px;
+      opacity: 0.6;
+      white-space: normal;
+    }
   }
 
   .slider-row {
