@@ -36,10 +36,7 @@ import {
   isStateValid,
   normalizeDesktopLyricsSettings,
 } from '@/shared/lyricsSnapshot';
-import { findActiveLineIndex } from '@/lyrics/timing/activeLine';
-
-/** 时钟/当前行推进间隔：50ms 与主窗口歌词页一致 */
-const TICK_MS = 50;
+import { createLyricPlayhead } from '@/lyrics/timing/playhead';
 
 export default {
   name: 'DesktopLyrics',
@@ -51,7 +48,6 @@ export default {
       payload: null,
       state: null,
       activeIndex: -1,
-      tickTimer: null,
     };
   },
   computed: {
@@ -91,10 +87,18 @@ export default {
   mounted() {
     if (!ipcRenderer) return;
     this.subscribe();
-    this.tickTimer = setInterval(this.tick, TICK_MS);
+    // 与歌词页/远程窗共用同一份播放头实现（可见 rAF、后台低频兜底）
+    this.playhead = createLyricPlayhead({
+      getLines: () => this.lines,
+      getTime: () => this.snapshotTime(),
+      onIndexChange: index => {
+        this.activeIndex = index;
+      },
+    });
+    this.playhead.start();
   },
   beforeDestroy() {
-    if (this.tickTimer) clearInterval(this.tickTimer);
+    if (this.playhead) this.playhead.stop();
     if (!ipcRenderer) return;
     // 只移除本组件自己的监听，不影响主窗口
     this.unsubscribe();
@@ -104,15 +108,11 @@ export default {
     snapshotTime() {
       return getSnapshotTime(this.state, Date.now());
     },
-    tick() {
-      const index = findActiveLineIndex(this.lines, this.snapshotTime());
-      if (index !== this.activeIndex) this.activeIndex = index;
-    },
     onPayload(payload) {
       if (!isPayloadValid(payload)) return;
       this.payload = payload;
       // 歌词换了，当前行立刻按新时间重算，避免沿用上一首的下标
-      this.tick();
+      this.playhead?.poll();
     },
     onState(state) {
       if (!isStateValid(state)) return;

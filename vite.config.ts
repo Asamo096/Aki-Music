@@ -8,6 +8,38 @@ import vue2 from '@vitejs/plugin-vue2';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
 
+
+/**
+ * 构建期断言：渲染产物里不能出现 Vue 的开发版。
+ *
+ * 为什么需要：Vue 2.7 的开发版会在 getTagNamespace / isReservedTag 里对 tag 调
+ * toLowerCase()，一旦某次渲染传进 undefined 就会抛
+ * "Cannot read properties of undefined (reading 'toLowerCase')"；
+ * 生产版这两个函数是空实现，不可能抛。我们曾在一个混入开发版 Vue 的打包产物里
+ * 看到过这条报错（bundle 里能查到真实的 getTagNamespace 实现），因此在这里兜底：
+ * 谁把 NODE_ENV 弄错，构建直接失败，而不是发出一个带开发期断言的包。
+ */
+const assertProductionVue = () => ({
+  name: 'aki-assert-production-vue',
+  apply: 'build' as const,
+  // 用 ThisType 声明 rollup 的上下文（this.error 才是类型安全的报错方式）
+  generateBundle(
+    this: { error: (message: string) => never },
+    _options: unknown,
+    bundle: Record<string, any>
+  ) {
+    for (const file of Object.values(bundle)) {
+      if (!file || file.type !== 'chunk' || typeof file.code !== 'string') continue;
+      if (file.code.includes('You are running Vue in development mode')) {
+        this.error(
+          '构建产物包含 Vue 开发版（renderer 会带开发期断言，可能抛 getTagNamespace(undefined) 之类的错误）。' +
+            '请检查 vite.config.ts 的 define 里 process.env.NODE_ENV 是否为 production。'
+        );
+      }
+    }
+  },
+});
+
 export default defineConfig(({ command, mode }) => {
   const root = __dirname;
   // --mode electron：桌面端渲染进程构建
@@ -28,6 +60,7 @@ export default defineConfig(({ command, mode }) => {
   return {
     plugins: [
       vue2(),
+      assertProductionVue(),
       // PWA 只用于 Web 构建：Electron 页面由本地服务提供，不需要 service worker
       ...(isElectron
         ? []

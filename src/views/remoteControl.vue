@@ -204,9 +204,8 @@ import {
   isStateValid,
   normalizeDesktopLyricsSettings,
 } from '@/shared/lyricsSnapshot';
-import { findActiveLineIndex } from '@/lyrics/timing/activeLine';
+import { createLyricPlayhead } from '@/lyrics/timing/playhead';
 
-const TICK_MS = 50;
 /** 紧凑模式下歌词区高度约 52px：上下留白各一半，首/末行也能居中 */
 const SPACER_COMPACT = '26px';
 /** 最大化后留白按视口算 */
@@ -232,7 +231,6 @@ export default {
       clickThroughHint: false,
       hintTimer: null,
       hotspotObserver: null,
-      tickTimer: null,
     };
   },
   computed: {
@@ -396,7 +394,7 @@ export default {
     ipcRenderer.on(CHANNELS.payload, (_event, payload) => {
       if (isPayloadValid(payload)) {
         this.payload = payload;
-        this.tick();
+        this.playhead?.poll();
       }
     });
     ipcRenderer.on(CHANNELS.state, (_event, state) => {
@@ -411,7 +409,15 @@ export default {
       if (status) this.maximized = Boolean(status.maximized);
     });
     this.requestInitialSnapshot();
-    this.tickTimer = setInterval(this.tick, TICK_MS);
+    // 与歌词页/桌面歌词共用同一份播放头实现
+    this.playhead = createLyricPlayhead({
+      getLines: () => this.lines,
+      getTime: () => this.snapshotTime(),
+      onIndexChange: index => {
+        this.activeIndex = index;
+      },
+    });
+    this.playhead.start();
 
     this.$nextTick(() => {
       this.measureHotspot();
@@ -423,7 +429,7 @@ export default {
     });
   },
   beforeDestroy() {
-    if (this.tickTimer) clearInterval(this.tickTimer);
+    if (this.playhead) this.playhead.stop();
     if (this.hintTimer) clearTimeout(this.hintTimer);
     if (this.hotspotObserver) this.hotspotObserver.disconnect();
   },
@@ -431,16 +437,12 @@ export default {
     snapshotTime() {
       return getSnapshotTime(this.state, Date.now());
     },
-    tick() {
-      const index = findActiveLineIndex(this.lines, this.snapshotTime());
-      if (index !== this.activeIndex) this.activeIndex = index;
-    },
     async requestInitialSnapshot() {
       try {
         const snapshot = await ipcRenderer.invoke('lyrics-snapshot:request');
         if (snapshot?.payload) {
           this.payload = snapshot.payload;
-          this.tick();
+          this.playhead?.poll();
         }
         if (snapshot?.state) this.state = snapshot.state;
       } catch (error) {

@@ -353,7 +353,6 @@ import {
   loadLyrics,
   parseLyricPayload,
   filterNeteaseLyricNoise,
-  findActiveLineIndex,
   getLineText,
   getLineSecondaryText,
 } from '@/lyrics';
@@ -369,6 +368,7 @@ import {
   CHANNELS,
   normalizeDesktopLyricsSettings,
 } from '@/shared/lyricsSnapshot';
+import { createLyricPlayhead } from '@/lyrics/timing/playhead';
 import ButtonIcon from '@/components/ButtonIcon.vue';
 import * as Vibrant from 'node-vibrant/dist/vibrant.worker.min.js';
 import Color from 'color';
@@ -391,7 +391,6 @@ export default {
   },
   data() {
     return {
-      lyricsInterval: null,
       /** 引擎产出的歌词（null = 无歌词） */
       lyricData: null,
       /** 是否纯音乐（点击行不跳转，与旧行为一致） */
@@ -511,18 +510,15 @@ export default {
       this.highlightLyricIndex = -1;
       this.instrumental = false;
       this.publishLyricsSnapshot();
+      this.lyricPlayhead?.poll();
       this.getLyric();
       this.getCoverColor();
     },
     showLyrics(show) {
       if (show) {
-        this.setLyricsInterval();
+        // 播放头始终在跑（Touch Bar 需要），这里只需恢复滚动能力
         this.$store.commit('enableScrolling', false);
       } else {
-        // 在 Electron 环境下，即使不显示歌词页面，也保持定时器运行以更新 Touch Bar
-        if (process.env.IS_ELECTRON !== true) {
-          clearInterval(this.lyricsInterval);
-        }
         this.$store.commit('enableScrolling', true);
         // Fullscreen is requested on documentElement, so it makes the whole
         // window fullscreen. Since the only way to leave fullscreen from the
@@ -575,10 +571,13 @@ export default {
       ],
       () => this.publishLyricsSnapshot()
     );
-    // 在 Electron 环境下立即启动歌词定时器，以便 Touch Bar 可以显示歌词
-    if (process.env.IS_ELECTRON === true) {
-      this.setLyricsInterval();
-    }
+    // 播放头：可见时 rAF、不可见时低频兜底，保证 Touch Bar 在后台也能更新
+    this.lyricPlayhead = createLyricPlayhead({
+      getLines: () => this.lines,
+      getTime: () => this.player.seek(null, false) ?? 0,
+      onIndexChange: this.onLyricLineChange,
+    });
+    this.lyricPlayhead.start();
     document.addEventListener('keydown', e => {
       if (e.key === 'F11') {
         e.preventDefault();
@@ -596,7 +595,10 @@ export default {
     this.exitFullscreen();
   },
   destroyed() {
-    clearInterval(this.lyricsInterval);
+    if (this.lyricPlayhead) {
+      this.lyricPlayhead.stop();
+      this.lyricPlayhead = null;
+    }
   },
   methods: {
     ...mapMutations(['toggleLyrics', 'updateModal']),
@@ -714,6 +716,8 @@ export default {
         : null;
       this.lyricTrackId = track.id;
       this.highlightLyricIndex = -1;
+      // 新歌词到位：立刻按当前位置判定一次，避免等到下一拍才高亮
+      this.lyricPlayhead?.poll();
 
       if (this.hasTranslation && !this.hasRoman) {
         this.lyricType = 'translation';
@@ -818,25 +822,18 @@ export default {
         copyLyric([primary, secondary].filter(Boolean).join(' '));
       }
     },
-    setLyricsInterval() {
-      this.lyricsInterval = setInterval(() => {
-        const progress = this.player.seek(null, false) ?? 0;
-        const index = findActiveLineIndex(this.lines, progress);
-        if (index === this.highlightLyricIndex) return;
-
-        this.highlightLyricIndex = index;
-
-        // 发送当前歌词到主进程（用于 Touch Bar 显示）
-        if (ipcRenderer && index >= 0) {
-          const currentLyricLine = this.lines[index];
-          if (currentLyricLine) {
-            // 只发送第一行歌词（原文），避免显示过长
-            ipcRenderer.send('updateLyric', {
-              lyric: getLineText(currentLyricLine),
-            });
-          }
+    /** 播放头的行变化回调：更新高亮 + 给 Touch Bar 上报当前行 */
+    onLyricLineChange(index) {
+      this.highlightLyricIndex = index;
+      if (ipcRenderer && index >= 0) {
+        const currentLyricLine = this.lines[index];
+        if (currentLyricLine) {
+          // 只发送原文，避免 Touch Bar 显示过长
+          ipcRenderer.send('updateLyric', {
+            lyric: getLineText(currentLyricLine),
+          });
         }
-      }, 50);
+      }
     },
     moveToFMTrash() {
       this.player.moveToFMTrash();
