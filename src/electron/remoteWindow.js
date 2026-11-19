@@ -40,6 +40,14 @@ let win = null;
 /** 紧凑尺寸（默认）与最大化时的窗口尺寸 */
 let maximized = false;
 let clickThroughEnabled = false;
+/**
+ * 解锁热区：**由渲染进程实测右上角控件区域后上报**（CSS 像素 = DIP）。
+ * 之前写死 84×40，而控件有四个按钮（约 110px 宽），靠右的两个能点、靠左的
+ * 经常被自己穿透掉 —— 热区必须跟着真实布局走。
+ */
+let unlockHotspot = null;
+/** 渲染进程 mousemove 最近一次解锁提示的时间：短时间内以它为准，轮询不抢 */
+let lastRenderHintAt = 0;
 let hotspotPolling = null;
 let unlockHover = false;
 let reportStatus = () => {};
@@ -84,8 +92,17 @@ const isCursorInHotspot = () => {
   if (!win || win.isDestroyed()) return false;
   const bounds = win.getBounds();
   const cursor = screen.getCursorScreenPoint();
-  // 窗口内容区左上角 ≈ 窗口左上角（无边框窗口没有额外装饰）
+  // 无边框窗口：窗口坐标即客户区坐标（DIP）
   const point = { x: cursor.x - bounds.x, y: cursor.y - bounds.y };
+  if (unlockHotspot) {
+    return (
+      point.x >= unlockHotspot.x &&
+      point.x <= unlockHotspot.x + unlockHotspot.width &&
+      point.y >= unlockHotspot.y &&
+      point.y <= unlockHotspot.y + unlockHotspot.height
+    );
+  }
+  // 兜底：渲染进程还没上报时按右侧一条估算
   const content = win.getContentBounds();
   return isInUnlockHotspot(point, {
     width: content.width,
@@ -97,6 +114,8 @@ const startHotspotPolling = () => {
   stopHotspotPolling();
   hotspotPolling = setInterval(() => {
     if (!win || win.isDestroyed() || !clickThroughEnabled) return;
+    // 渲染进程的 mousemove 更及时（进入热区立刻解锁）；它刚说过话就别抢
+    if (Date.now() - lastRenderHintAt < 400) return;
     const next = isCursorInHotspot();
     if (process.env.AKI_DEBUG_REMOTE) {
       const bounds = win.getBounds();
@@ -148,6 +167,7 @@ const shutdown = () => {
   clickThroughEnabled = false;
   unlockHover = false;
   maximized = false;
+  unlockHotspot = null;
   const current = win;
   win = null;
   if (current && !current.isDestroyed()) current.destroy();
@@ -165,6 +185,7 @@ export const openRemote = async ({ preload }) => {
   clickThroughEnabled = false;
   unlockHover = false;
   maximized = false;
+  unlockHotspot = null;
 
   const initial = compactBounds();
 
@@ -280,10 +301,17 @@ export const initRemoteIpc = ({ mainWindow, preload }) => {
     Boolean(mainWindow) && event.sender === mainWindow.webContents;
 
   ipcMain.handle(CHANNELS.remoteToggle, async event => {
-    console.log(
-      `[remote] toggle from sender ${event.sender.id}, isMain=${isMain(event)}`
-    );
-    if (!isMain(event)) return { ok: false, reason: 'forbidden' };
+    // 主窗口用于开/关；远程窗口自身也用这个通道关闭（右上角 ×）
+    const fromRemote =
+      win && !win.isDestroyed() && event.sender === win.webContents;
+    if (!isMain(event) && !fromRemote) {
+      return { ok: false, reason: 'forbidden' };
+    }
+    if (fromRemote) {
+      // 远程窗口只能关自己：避免把"点关闭"变成再开一个
+      closeRemote();
+      return { ok: true, status: status() };
+    }
     if (isRemoteOpen()) {
       closeRemote();
       return { ok: true, status: status() };
@@ -305,6 +333,45 @@ export const initRemoteIpc = ({ mainWindow, preload }) => {
       (win && !win.isDestroyed() && event.sender === win.webContents);
     if (!allowed) return { ok: false, reason: 'forbidden' };
     return toggleRemoteMaximize();
+  });
+
+  ipcMain.on('remote:hotspot', (event, rect) => {
+    if (!win || win.isDestroyed() || event.sender !== win.webContents) return;
+    if (
+      !rect ||
+      !['x', 'y', 'width', 'height'].every(k => Number.isFinite(rect[k])) ||
+      rect.width <= 0 ||
+      rect.height <= 0
+    ) {
+      return;
+    }
+    unlockHotspot = {
+      x: Math.round(rect.x),
+      y: Math.round(rect.y),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    };
+    // 布局变了就立刻按新热区重算一次（最大化/还原时控件会变大）
+    if (clickThroughEnabled) {
+      const next = isCursorInHotspot();
+      if (next !== unlockHover) {
+        unlockHover = next;
+        applyIgnoreMouseEvents();
+        emitStatus();
+      }
+    }
+  });
+
+  // 渲染进程 mousemove：光标进入/离开解锁热区（比 150ms 轮询快一个数量级）
+  ipcMain.on('remote:hover-unlock', (event, inside) => {
+    if (!win || win.isDestroyed() || event.sender !== win.webContents) return;
+    lastRenderHintAt = Date.now();
+    if (!clickThroughEnabled) return;
+    const next = Boolean(inside);
+    if (next === unlockHover) return;
+    unlockHover = next;
+    applyIgnoreMouseEvents();
+    emitStatus();
   });
 
   // 桌面歌词外观设置：远程窗口 → 主窗口（真值在 settings.desktopLyrics）

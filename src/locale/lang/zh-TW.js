@@ -287,6 +287,7 @@ export default {
   remote: {
     toggle: '遠端控制視窗',
     clickThrough: '點擊穿透（滑鼠穿過視窗）',
+    clickThroughHint: '點擊穿透已開啟：把滑鼠移到右上角控制項即可操作',
     close: '關閉遠端控制',
     maximize: '最大化',
     restore: '還原',

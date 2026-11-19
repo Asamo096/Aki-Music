@@ -290,6 +290,7 @@ export default {
   remote: {
     toggle: '远程控制窗口',
     clickThrough: '点击穿透（鼠标穿过窗口）',
+    clickThroughHint: '点击穿透已开启：把鼠标移到右上角控件即可操作',
     close: '关闭远程控制',
     maximize: '最大化',
     restore: '还原',

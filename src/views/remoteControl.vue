@@ -4,6 +4,8 @@
     :class="{ 'is-click-through': clickThrough, 'is-maximized': maximized }"
     :data-click-through="clickThrough ? 'active' : 'inactive'"
     :style="rootStyle"
+    @mousemove="onMouseMove"
+    @mouseleave="onMouseLeave"
   >
     <div class="card">
       <!-- 顶部：拖拽区 + 右上角控件（齿轮 / 穿透 / 最大化 / 关闭） -->
@@ -21,7 +23,10 @@
             <div class="artist" :title="artist">{{ artist }}</div>
           </div>
         </div>
-        <div class="window-actions click-through-interactive">
+        <div
+          ref="windowActions"
+          class="window-actions click-through-interactive"
+        >
           <button
             class="icon-button"
             :class="{ active: settingsOpen }"
@@ -55,6 +60,10 @@
             <svg-icon icon-class="x" />
           </button>
         </div>
+      </div>
+
+      <div v-if="clickThroughHint" class="click-through-hint">
+        {{ $t('remote.clickThroughHint') }}
       </div>
 
       <!-- 桌面歌词外观（齿轮）：位置 / 字体 / 大小 / 颜色 -->
@@ -228,6 +237,13 @@ export default {
       maximized: false,
       settingsOpen: false,
       pendingFontSize: DESKTOP_LYRICS_DEFAULTS.fontSize,
+      /** 解锁热区（CSS 像素 = DIP，相对窗口左上角），实测后上报给主进程 */
+      hotspotRect: null,
+      /** 光标当前是否在热区内（渲染进程侧判定，用于即时解锁） */
+      pointerInHotspot: false,
+      clickThroughHint: false,
+      hintTimer: null,
+      hotspotObserver: null,
       tickTimer: null,
     };
   },
@@ -317,9 +333,20 @@ export default {
     });
     this.requestInitialSnapshot();
     this.tickTimer = setInterval(this.tick, TICK_MS);
+
+    this.$nextTick(() => {
+      this.measureHotspot();
+      // 最大化/还原后控件会变大变位，热区要跟着走
+      if (typeof ResizeObserver !== 'undefined' && this.$el) {
+        this.hotspotObserver = new ResizeObserver(() => this.measureHotspot());
+        this.hotspotObserver.observe(this.$el);
+      }
+    });
   },
   beforeDestroy() {
     if (this.tickTimer) clearInterval(this.tickTimer);
+    if (this.hintTimer) clearTimeout(this.hintTimer);
+    if (this.hotspotObserver) this.hotspotObserver.disconnect();
   },
   methods: {
     snapshotTime() {
@@ -340,6 +367,48 @@ export default {
       } catch (error) {
         console.warn('[remote] 获取初始快照失败', error);
       }
+    },
+    /**
+     * 测量右上角控件区域并上报主进程。
+     * 主进程用它判断"光标是否在解锁热区"，因此热区永远等于**实际按钮范围**，
+     * 不会因为按钮数量变化（现在是四个）而点不到。
+     */
+    measureHotspot() {
+      const el = this.$refs.windowActions;
+      if (!el || !ipcRenderer) return;
+      const rect = el.getBoundingClientRect();
+      const pad = 10;
+      this.hotspotRect = {
+        x: Math.max(0, rect.left - pad),
+        y: Math.max(0, rect.top - pad),
+        width: Math.min(innerWidth, rect.width + pad * 2),
+        height: Math.min(innerHeight, rect.height + pad * 2),
+      };
+      ipcRenderer.send('remote:hotspot', this.hotspotRect);
+    },
+    isInHotspot(event) {
+      const rect = this.hotspotRect;
+      if (!rect) return false;
+      return (
+        event.clientX >= rect.x &&
+        event.clientX <= rect.x + rect.width &&
+        event.clientY >= rect.y &&
+        event.clientY <= rect.y + rect.height
+      );
+    },
+    /** 穿透状态下的即时解锁：进入热区立刻恢复可点（主进程轮询只是兜底） */
+    onMouseMove(event) {
+      if (!this.clickThrough || !ipcRenderer) return;
+      const inside = this.isInHotspot(event);
+      if (inside === this.pointerInHotspot) return;
+      this.pointerInHotspot = inside;
+      ipcRenderer.send('remote:hover-unlock', inside);
+    },
+    onMouseLeave() {
+      if (!this.clickThrough || !ipcRenderer) return;
+      if (!this.pointerInHotspot) return;
+      this.pointerInHotspot = false;
+      ipcRenderer.send('remote:hover-unlock', false);
     },
     sendCommand(type) {
       if (!ipcRenderer) return;
@@ -364,7 +433,19 @@ export default {
         CHANNELS.remoteClickThrough,
         !this.clickThrough
       );
-      if (result?.ok) this.clickThrough = Boolean(result.status?.clickThrough);
+      if (!result?.ok) return;
+      this.clickThrough = Boolean(result.status?.clickThrough);
+      this.pointerInHotspot = false;
+      if (this.hintTimer) clearTimeout(this.hintTimer);
+      if (this.clickThrough) {
+        // 提示"怎么关掉它"：否则用户很容易以为窗口卡死了
+        this.clickThroughHint = true;
+        this.hintTimer = setTimeout(() => {
+          this.clickThroughHint = false;
+        }, 3200);
+      } else {
+        this.clickThroughHint = false;
+      }
     },
     async toggleMaximize() {
       if (!ipcRenderer) return;

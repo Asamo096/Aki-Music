@@ -45,6 +45,9 @@ const SEND_CHANNELS = [
   'remote-command',
   // 远程窗口 → 主进程 → 主窗口：桌面歌词外观设置
   'desktop-lyrics:settings',
+  // 远程窗口 → 主进程：解锁热区实测矩形 + 光标是否在热区内（点击穿透恢复路径）
+  'remote:hotspot',
+  'remote:hover-unlock',
 ];
 
 /** 渲染进程 → 主进程，需要返回值 */
