@@ -342,7 +342,7 @@ export default {
     ownerHint:
       'The room follows your playback: members will follow your play/pause/track changes.',
     memberHint:
-      'You are following the host; your play/pause/track changes are reported too (the official client receives them in real time; an Aki host cannot read member actions).',
+      'You are following the host; your play/pause/track changes are synced to the host too (playing a song outside the shared playlist syncs the playlist first).',
     leaveRoom: 'Leave Room',
   },
   contextMenu: {

@@ -441,7 +441,11 @@ class ListenTogetherService {
         displayList: list.join(','),
       });
       if (res.code === 200 && res.data && res.data.result) {
-        this._commit({ playlistVersion: this._playlistVersion });
+        this._roomPlaylist = list;
+        this._commit({
+          playlistVersion: this._playlistVersion,
+          roomPlaylist: list,
+        });
         return true;
       }
       store.dispatch('showToast', res.message || '播放列表同步失败');
@@ -489,6 +493,25 @@ class ListenTogetherService {
       if (newList.join(',') !== this._roomPlaylist.join(',')) {
         this._roomPlaylist = newList;
         this._commit({ roomPlaylist: newList });
+        // 一起听的队列是**共享**的：把本机队列对齐到房间歌单，
+        // 否则本机下一首很可能不在歌单里，上报的 GOTO 会被服务端静默丢弃
+        //（实测：不在歌单里的目标返回 200 但不会写入房间指令）。
+        // 只替换队列，不打断当前正在播放的歌。
+        const player = store.state.player;
+        if (
+          player &&
+          newList.length &&
+          !player.shuffle &&
+          (player._list || []).join(',') !== newList.join(',')
+        ) {
+          player.list = newList;
+          const idx = newList.indexOf(String(player.currentTrackID));
+          if (idx >= 0) player.current = idx;
+          player._playlistSource = {
+            type: 'listen-together',
+            id: this._roomId,
+          };
+        }
         if (newList.length) {
           try {
             const detail = await getTrackDetail(newList.join(','));
@@ -612,10 +635,18 @@ class ListenTogetherService {
     this._userOverrideUntil = Date.now() + USER_OVERRIDE_MS;
 
     if (this._gotoTimer) clearTimeout(this._gotoTimer);
-    this._gotoTimer = setTimeout(() => {
+    this._gotoTimer = setTimeout(async () => {
       this._gotoTimer = null;
       const finalTrackId = store.state.player?.currentTrackID;
       if (!finalTrackId) return;
+      // 目标不在共享歌单里：先更新歌单，否则服务端会静默丢弃这条 GOTO
+      //（实测返回 200，但房间指令不变，房主也就不会切歌）
+      if (
+        this._roomPlaylist.length &&
+        !this._roomPlaylist.includes(String(finalTrackId))
+      ) {
+        await this.syncCurrentPlaylist();
+      }
       this.reportPlayCommand('GOTO', {
         formerSongId: this._lastTrackId ?? -1,
         targetSongId: finalTrackId,

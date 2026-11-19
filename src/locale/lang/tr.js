@@ -334,7 +334,7 @@ export default {
     ownerHint:
       'Oda senin oynatmanı izler: üyeler oynat/duraklat/şarkı değişimlerini takip eder.',
     memberHint:
-      'Sunucuyu takip ediyorsun; oynat/duraklat/şarkı değişimlerin de bildirilir (resmi istemci bunları gerçek zamanlı alır; Aki sunucusu üye işlemlerini okuyamaz).',
+      'Sunucuyu takip ediyorsun; oynat/duraklat/şarkı değişimlerin de sunucuya senkronlanır (paylaşılan listeye eklenmemiş bir şarkıda liste önce güncellenir).',
     leaveRoom: 'Odadan Ayrıl',
   },
   contextMenu: {
