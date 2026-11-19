@@ -114,15 +114,29 @@ describe('shouldApplyPlayCommand', () => {
     expect(shouldApplyPlayCommand(baseOptions({ userId: 'A' }))).toBe(false);
   });
 
-  it('自己上报过的 clientSeq 不回放（多设备同账号也能区分）', () => {
+  it('同账号、自己上报过的 clientSeq 不回放（多设备同账号也能区分）', () => {
     expect(
       shouldApplyPlayCommand(
         baseOptions({
-          cmd: command({ userId: 'C', clientSeq: 42 }),
+          userId: 'A',
+          cmd: command({ userId: 'A', clientSeq: 42 }),
           sentClientSeqs: new Set([42]),
         })
       )
     ).toBe(false);
+  });
+
+  it('对方账号的 clientSeq 与自己的编号相同也应应用', () => {
+    // clientSeq 是每个客户端各自的自增计数器，数值撞车是常态；
+    // 只看编号会把房主的指令误判成自己的回声（实测：房主切歌本机不跟随）
+    expect(
+      shouldApplyPlayCommand(
+        baseOptions({
+          cmd: command({ userId: 'A', clientSeq: 7 }),
+          sentClientSeqs: new Set([7, 8]),
+        })
+      )
+    ).toBe(true);
   });
 
   it('同一签名只应用一次', () => {

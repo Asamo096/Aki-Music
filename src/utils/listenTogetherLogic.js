@@ -35,10 +35,19 @@ export const shouldApplyPlayCommand = ({
   followRoomPlayback,
 }) => {
   if (!followRoomPlayback || !cmd) return false;
-  // 自己上报的指令：clientSeq 命中（多设备同账号也能区分）
-  if (cmd.clientSeq != null && sentClientSeqs.has(cmd.clientSeq)) return false;
-  // 同账号的指令不回放
+  // 同账号的指令不回放（包括同账号的其他设备）
   if (String(cmd.userId) === String(userId)) return false;
+  // 自己上报的指令：clientSeq 命中才跳过。
+  // **必须限定同一账号**：clientSeq 是每个客户端各自的自增计数器，
+  // 对方的 clientSeq 与我们的会出现相同数值（1、2、3…）。之前不限定账号，
+  // 导致房主的指令被误判成"自己的回声"而丢弃（实测：房主切歌本机不跟随）。
+  if (
+    cmd.clientSeq != null &&
+    String(cmd.userId) === String(userId) &&
+    sentClientSeqs.has(cmd.clientSeq)
+  ) {
+    return false;
+  }
   // 同一签名只应用一次
   if (buildPlayCommandSignature(cmd) === lastSignature) return false;
   return true;
