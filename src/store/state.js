@@ -46,6 +46,30 @@ export default {
       show: false,
       afterCreateAddTrackID: 0,
     },
+    listenTogetherModal: {
+      show: false,
+    },
+  },
+  /**
+   * 双人「一起听」（M4）。真值由 utils/listenTogether.js 的 service 维护，
+   * 通过 updateListenTogether 提交到这里供 UI 读写。
+   */
+  listenTogether: {
+    inRoom: false,
+    status: 'alone', // alone | together | togetherOwner
+    roomId: '',
+    inviterId: '',
+    creatorId: '',
+    roomMembers: [],
+    roomPlaylist: [],
+    roomPlaylistTracks: [],
+    roomPlayCommand: null,
+    followRoomPlayback: true,
+    playlistVersion: 0,
+    clientSeq: 0,
+    shareLink: '',
+    syncing: false,
+    lastError: '',
   },
   dailyTracks: [],
   lastfm: JSON.parse(localStorage.getItem('lastfm')) || {},

@@ -174,6 +174,13 @@
             @click.native="toggleLyrics"
             ><svg-icon icon-class="arrow-up"
           /></button-icon>
+          <button-icon
+            :class="{ active: listenTogether.inRoom }"
+            :title="$t('listenTogether.title')"
+            style="margin-left: 12px"
+            @click.native="openListenTogetherPanel"
+            ><svg-icon icon-class="headphones"
+          /></button-icon>
         </div>
       </div>
     </div>
@@ -201,7 +208,7 @@ export default {
     };
   },
   computed: {
-    ...mapState(['player', 'settings', 'data']),
+    ...mapState(['player', 'settings', 'data', 'listenTogether']),
     currentTrack() {
       return this.player.currentTrack;
     },
@@ -230,7 +237,14 @@ export default {
     window.removeEventListener('keydown', this.handleKeydown);
   },
   methods: {
-    ...mapMutations(['toggleLyrics']),
+    openListenTogetherPanel() {
+      this.updateModal({
+        modalName: 'listenTogetherModal',
+        key: 'show',
+        value: true,
+      });
+    },
+    ...mapMutations(['toggleLyrics', 'updateModal']),
     ...mapActions(['showToast', 'likeATrack']),
     handleClick(event) {
       if (event.target == this.mouseDownTarget) {

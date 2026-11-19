@@ -1,4 +1,5 @@
 import { getAlbum } from '@/api/album';
+import listenTogetherService from '@/utils/listenTogether';
 import { getArtist } from '@/api/artist';
 import { trackScrobble, trackUpdateNowPlaying } from '@/api/lastfm';
 import { fmTrash, personalFM } from '@/api/others';
@@ -518,6 +519,7 @@ export default class {
       }
       this._currentTrack = track;
       this._updateMediaSessionMetaData(track);
+      listenTogetherService.onTrackChange();
       return this._replaceCurrentTrackAudio(
         track,
         autoplay,
@@ -831,6 +833,7 @@ export default class {
       this._setPlaying(false);
       setTitle(null);
       this._pauseDiscordPresence(this._currentTrack);
+      listenTogetherService.onPause();
     });
   }
   play() {
@@ -845,6 +848,7 @@ export default class {
       // 避免因"忘记设置"导致在播放时播放器不显示的Bug
       this._enabled = true;
       this._setPlaying(true);
+      listenTogetherService.onPlay();
       if (this._currentTrack.name) {
         setTitle(this._currentTrack);
       }
@@ -875,6 +879,8 @@ export default class {
       this._howler?.seek(time);
       if (this._playing)
         this._playDiscordPresence(this._currentTrack, this.seek(null, false));
+      // 一起听：把拖动进度上报给房间（跟随远端产生的 seek 会被抑制窗口挡住）
+      listenTogetherService.onSeek();
     }
     return this._howler === null ? 0 : this._howler.seek();
   }

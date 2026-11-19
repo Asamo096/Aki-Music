@@ -309,6 +309,30 @@ export default {
     color: 'Renk',
     colorAuto: 'Otomatik (kapak rengi)',
   },
+  listenTogether: {
+    title: 'Birlikte Dinle',
+    createRoom: 'Oda Oluştur',
+    joinRoom: 'Odaya Katıl',
+    creating: 'Oluşturuluyor…',
+    createDesc:
+      'İki kişilik bir oda oluşturup paylaşım bağlantısını arkadaşınıza gönderin. Oda, resmi NetEase istemcisiyle uyumludur.',
+    joinDesc:
+      'Arkadaşınızın gönderdiği bağlantıyı (veya "odaId:davetciId") yapıştırın.',
+    joinPlaceholder: 'Paylaşım bağlantısı / odaId:davetciId',
+    members: 'Odadakiler ({count})',
+    owner: 'Sunucu',
+    member: 'Dinleyici',
+    copyLink: 'Bağlantıyı Kopyala',
+    linkCopied: 'Paylaşım bağlantısı kopyalandı',
+    nowPlaying: 'Odada çalıyor',
+    playing: 'Çalıyor',
+    paused: 'Duraklatıldı',
+    noSong: 'Henüz oynatma yok',
+    followOwner: 'Sunucuyu otomatik izle',
+    followHint:
+      'Sunucunun oynat/duraklat/şarkı değişimi ve konumunu eşitler (yalnızca 5s üzeri kayma düzeltilir).',
+    leaveRoom: 'Odadan Ayrıl',
+  },
   contextMenu: {
     play: 'Oynat',
     addToQueue: 'Sonrakini Oynat',

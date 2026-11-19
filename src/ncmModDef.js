@@ -625,6 +625,55 @@ module.exports = [
     route: '/activate/init/profile',
     module: require('@neteaseapireborn/api/module/activate_init_profile'),
   },
+  // 双人「一起听」（M4）。上游模块已随 @neteaseapireborn/api 一起安装，
+  // 只是默认没有注册路由；客户端见 src/api/listenTogether.js。
+  // 注意：这些路由之间没有前缀包含关系（room/create vs room/check 等），
+  // 但依然放在一起便于核对顺序（路由是按声明顺序 app.use 前缀匹配的）。
+  {
+    identifier: 'listentogether_room_create',
+    route: '/listentogether/room/create',
+    module: require('@neteaseapireborn/api/module/listentogether_room_create'),
+  },
+  {
+    identifier: 'listentogether_room_check',
+    route: '/listentogether/room/check',
+    module: require('@neteaseapireborn/api/module/listentogether_room_check'),
+  },
+  {
+    identifier: 'listentogether_accept',
+    route: '/listentogether/accept',
+    module: require('@neteaseapireborn/api/module/listentogether_accept'),
+  },
+  {
+    identifier: 'listentogether_end',
+    route: '/listentogether/end',
+    module: require('@neteaseapireborn/api/module/listentogether_end'),
+  },
+  {
+    identifier: 'listentogether_status',
+    route: '/listentogether/status',
+    module: require('@neteaseapireborn/api/module/listentogether_status'),
+  },
+  {
+    identifier: 'listentogether_heatbeat',
+    route: '/listentogether/heatbeat',
+    module: require('@neteaseapireborn/api/module/listentogether_heatbeat'),
+  },
+  {
+    identifier: 'listentogether_play_command',
+    route: '/listentogether/play/command/report',
+    module: require('@neteaseapireborn/api/module/listentogether_play_command'),
+  },
+  {
+    identifier: 'listentogether_sync_playlist_get',
+    route: '/listentogether/sync/playlist/get',
+    module: require('@neteaseapireborn/api/module/listentogether_sync_playlist_get'),
+  },
+  {
+    identifier: 'listentogether_sync_list_command',
+    route: '/listentogether/sync/list/command/report',
+    module: require('@neteaseapireborn/api/module/listentogether_sync_list_command'),
+  },
   {
     identifier: 'api',
     route: '/api',

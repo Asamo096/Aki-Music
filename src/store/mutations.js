@@ -52,6 +52,12 @@ export default {
   toggleLyrics(state) {
     state.showLyrics = !state.showLyrics;
   },
+  updateListenTogether(state, patch) {
+    state.listenTogether = {
+      ...state.listenTogether,
+      ...patch,
+    };
+  },
   updateDailyTracks(state, dailyTracks) {
     state.dailyTracks = dailyTracks;
   },
