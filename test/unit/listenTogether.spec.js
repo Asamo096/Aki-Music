@@ -60,12 +60,12 @@ describe('parseListenTogetherShareLink', () => {
     const roomId = '0af7a923b79c2c06e2fbd080902bcf15_1795062926';
     expect(
       parseListenTogetherShareLink(
-        `https://st.music.163.com/listen-together/share/?roomId=${roomId}&inviterId=3900179577`
+        `https://st.music.163.com/listen-together/share/?roomId=${roomId}&inviterId=1234567890`
       )
-    ).toEqual({ roomId, inviterId: '3900179577' });
-    expect(parseListenTogetherShareLink(`${roomId}:3900179577`)).toEqual({
+    ).toEqual({ roomId, inviterId: '1234567890' });
+    expect(parseListenTogetherShareLink(`${roomId}:1234567890`)).toEqual({
       roomId,
-      inviterId: '3900179577',
+      inviterId: '1234567890',
     });
   });
 

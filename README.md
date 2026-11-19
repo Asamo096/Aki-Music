@@ -3,7 +3,7 @@
 > 一个桌面音乐播放器，基于 [YesPlayMusic](https://github.com/qier222/YesPlayMusic) 二次开发。
 > 目标是保留 YesPlayMusic 完整的功能骨架，并把全屏歌词体验做到 [Folia](https://github.com/chthollyphile/folia-major) 的水准。
 
-**项目状态：M0 / M1 已完成，下一步是 M2（歌词引擎）；不可对外发布。**
+**项目状态：M0–M4 已完成（M4「双人一起听」五项验收通过）；下一步 M5（发布收尾）。**
 
 工具链已换成 Vite + esbuild，Electron 已升到 43，**渲染进程已沙箱化**
 （无 `require`/`process`，IPC 走白名单桥，开启 `webSecurity` 并配置 CSP），
