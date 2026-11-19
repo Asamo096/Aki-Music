@@ -501,16 +501,24 @@ class ListenTogetherService {
         if (
           player &&
           newList.length &&
-          !player.shuffle &&
           (player._list || []).join(',') !== newList.join(',')
         ) {
-          player.list = newList;
-          const idx = newList.indexOf(String(player.currentTrackID));
-          if (idx >= 0) player.current = idx;
+          const currentId = String(player.currentTrackID ?? '');
+          player._isPersonalFM = false;
+          player._list = newList;
           player._playlistSource = {
             type: 'listen-together',
             id: this._roomId,
           };
+          if (player.shuffle) {
+            // 随机模式下播放用的是 _shuffledList，只改 _list 不生效；
+            // 以当前歌曲为第一首重排，保证"下一首"仍落在共享歌单内
+            await player._shuffleTheList(
+              newList.includes(currentId) ? currentId : 'first'
+            );
+          }
+          const idx = player.list.indexOf(currentId);
+          if (idx >= 0) player.current = idx;
         }
         if (newList.length) {
           try {
