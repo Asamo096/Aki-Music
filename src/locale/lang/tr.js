@@ -308,6 +308,10 @@ export default {
     },
   },
   remote: {
+    style: 'Söz Stili',
+    styleClassic: 'Klasik',
+    styleSentence: 'Tek satır',
+    styleGlyph: 'Kelime kelime',
     toggle: 'Uzak Masaüstü Kontrol Penceresi',
     clickThrough: 'Tıklamayı geçir (tıklamalar pencereden geçsin)',
     clickThroughHint:

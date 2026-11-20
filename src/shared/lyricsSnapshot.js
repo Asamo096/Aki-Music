@@ -52,8 +52,12 @@ export const DESKTOP_LYRICS_FONT_PRESETS = [
   'custom',
 ];
 
+/** 桌面歌词呈现样式：经典（DOM）/ 单句 / 逐字（Canvas） */
+export const DESKTOP_LYRICS_VISUAL_STYLES = ['classic', 'sentence', 'glyph'];
+
 export const DESKTOP_LYRICS_DEFAULTS = {
   position: 'center',
+  visualStyle: 'classic',
   fontPreset: 'inherit',
   /** fontPreset === 'custom' 时使用的字体族名 */
   fontFamily: null,
@@ -81,6 +85,9 @@ export const normalizeDesktopLyricsSettings = (value = {}) => {
     position: DESKTOP_LYRICS_POSITIONS.includes(source.position)
       ? source.position
       : DESKTOP_LYRICS_DEFAULTS.position,
+    visualStyle: DESKTOP_LYRICS_VISUAL_STYLES.includes(source.visualStyle)
+      ? source.visualStyle
+      : DESKTOP_LYRICS_DEFAULTS.visualStyle,
     fontPreset: DESKTOP_LYRICS_FONT_PRESETS.includes(source.fontPreset)
       ? source.fontPreset
       : DESKTOP_LYRICS_DEFAULTS.fontPreset,

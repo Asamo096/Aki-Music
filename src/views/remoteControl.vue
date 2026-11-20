@@ -82,6 +82,20 @@
           </div>
         </div>
 
+        <div class="row">
+          <span class="label">{{ $t('remote.style') }}</span>
+          <div class="segmented">
+            <button
+              v-for="option in styleOptions"
+              :key="option.value"
+              :class="{ active: desktopSetting.visualStyle === option.value }"
+              @click="sendDesktopSetting({ visualStyle: option.value })"
+            >
+              {{ $t(option.labelKey) }}
+            </button>
+          </div>
+        </div>
+
         <div class="row font-row">
           <span class="label">{{ $t('remote.font') }}</span>
           <FontChooser
@@ -339,6 +353,13 @@ export default {
           labelKey: 'settings.lyricsFont.presetLabels.mono',
           preview: '"Sarasa Mono SC", Consolas, monospace',
         },
+      ];
+    },
+    styleOptions() {
+      return [
+        { value: 'classic', labelKey: 'remote.styleClassic' },
+        { value: 'sentence', labelKey: 'remote.styleSentence' },
+        { value: 'glyph', labelKey: 'remote.styleGlyph' },
       ];
     },
     positionOptions() {

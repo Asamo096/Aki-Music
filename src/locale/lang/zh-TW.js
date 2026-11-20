@@ -304,6 +304,10 @@ export default {
     },
   },
   remote: {
+    style: '歌詞樣式',
+    styleClassic: '經典',
+    styleSentence: '單句',
+    styleGlyph: '逐字',
     toggle: '遠端控制視窗',
     clickThrough: '點擊穿透（滑鼠穿過視窗）',
     clickThroughHint: '點擊穿透已開啟：把滑鼠移到右上角控制項即可操作',

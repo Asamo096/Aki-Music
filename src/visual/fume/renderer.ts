@@ -32,6 +32,18 @@ export interface FumeRendererOptions {
   accent: string;
   theme: 'dark' | 'light';
   quality: FumeQuality;
+  /** 文字锚点（0..1，默认 0.46） */
+  anchorRatio?: number;
+  /** 透明模式（桌面壁纸层：不画遮罩/渐变边缘） */
+  transparent?: boolean;
+  /** 是否画几何形状（桌面默认关闭） */
+  showShapes?: boolean;
+  /** 是否显示下一句预览（桌面默认关闭） */
+  showNextPreview?: boolean;
+  /** 间奏是否展示 overview（桌面默认关闭） */
+  showOverview?: boolean;
+  /** 正文颜色覆盖（桌面歌词自定义颜色） */
+  textColor?: string;
 }
 
 export interface FumeDrawOptions {
@@ -255,7 +267,7 @@ export default class FumeRenderer {
     ctx.textAlign = 'left';
 
     const dark = this.options.theme !== 'light';
-    const baseColor = dark ? '255,255,255' : '28,28,30';
+    const baseColor = this.options.textColor || (dark ? '#ffffff' : '#1c1c1e');
     const accent = this.resolveAccent();
     const focusTarget = this.activeIndex >= 0 && this.lines.length ? 1 : 0;
     if (reduceMotion) {
@@ -267,18 +279,22 @@ export default class FumeRenderer {
     if (this.focusAmount < 0.001) this.focusAmount = 0;
     if (this.focusAmount > 0.999) this.focusAmount = 1;
 
-    this.drawBackground({ now, level, dark, accent, baseColor });
-    this.drawShapes({ now, level, accent });
+    if (!this.options.transparent) {
+      this.drawBackground({ now, level, dark, accent, baseColor });
+    }
+    if (this.options.showShapes !== false) {
+      this.drawShapes({ now, level, accent });
+    }
     this.drawParticles({ dt, level, playing, reduceMotion, accent });
 
     this.hitRects = [];
     if (focusTarget || this.focusAmount > 0) {
       this.drawFocusLine(now, level, accent, baseColor, dark);
     }
-    if (this.focusAmount < 1) {
+    if (this.focusAmount < 1 && this.options.showOverview !== false) {
       this.drawOverview(now, this.focusAmount, accent, baseColor, dark);
     }
-    this.drawEdgeFade();
+    if (!this.options.transparent) this.drawEdgeFade();
 
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;
@@ -410,12 +426,13 @@ export default class FumeRenderer {
     ctx.fillRect(0, 0, width, height);
 
     // 文字区的径向底色：让超大字在任何背景上都能读清
+    const anchor = this.options.anchorRatio ?? LINE_CENTER_RATIO;
     const gradient = ctx.createRadialGradient(
       width * 0.5,
-      height * LINE_CENTER_RATIO,
+      height * anchor,
       Math.max(40, width * 0.08),
       width * 0.5,
-      height * LINE_CENTER_RATIO,
+      height * anchor,
       Math.max(width, height) * 0.7
     );
     const scrim = dark ? 'rgba(4,5,9,0.5)' : 'rgba(255,255,255,0.55)';
@@ -507,7 +524,8 @@ export default class FumeRenderer {
         this.spawnCarry -= 1;
         if (this.particles.length >= limit) break;
         const life = 1.6 + Math.random() * 2.4;
-        const centerY = this.height * LINE_CENTER_RATIO;
+        const centerY =
+          this.height * (this.options.anchorRatio ?? LINE_CENTER_RATIO);
         this.particles.push({
           x: this.width * (0.18 + Math.random() * 0.64),
           y: centerY + (Math.random() - 0.5) * this.height * 0.3,
@@ -565,7 +583,7 @@ export default class FumeRenderer {
     const lineStart = Number(this.lines[index]?.startTime) || 0;
     const lineEnd = Number(this.lines[index]?.endTime) || lineStart;
 
-    const centerY = height * LINE_CENTER_RATIO;
+    const centerY = height * (this.options.anchorRatio ?? LINE_CENTER_RATIO);
     const scale = 0.96 + focus * 0.04;
     const top = centerY - layout.height / 2;
     const textAlpha = focus;
@@ -584,7 +602,7 @@ export default class FumeRenderer {
 
       // 未揭示：低亮底字
       ctx.globalAlpha = 0.16 * textAlpha;
-      ctx.fillStyle = `rgb(${baseColor})`;
+      ctx.fillStyle = baseColor;
       ctx.fillText(row.text, rowX, rowY + layout.lineHeight / 2);
 
       const revealed = resolveRevealedCount(row, now);
@@ -629,7 +647,7 @@ export default class FumeRenderer {
       ctx.font = this.font(fontSize, 400);
       ctx.textAlign = 'center';
       ctx.globalAlpha = 0.68 * textAlpha;
-      ctx.fillStyle = `rgb(${baseColor})`;
+      ctx.fillStyle = baseColor;
       ctx.fillText(
         layout.translation,
         width / 2,
@@ -637,11 +655,13 @@ export default class FumeRenderer {
       );
     }
 
-    // 下一句预览
+    // 下一句预览（桌面歌词默认关闭）
     const next =
-      this.lines[
-        (this.activeIndex >= 0 ? this.activeIndex : this.focusIndex) + 1
-      ];
+      this.options.showNextPreview === false
+        ? null
+        : this.lines[
+            (this.activeIndex >= 0 ? this.activeIndex : this.focusIndex) + 1
+          ];
     if (next) {
       const nextText = (next.words || []).map(word => word.text).join('');
       if (nextText) {
@@ -649,7 +669,7 @@ export default class FumeRenderer {
         ctx.font = this.font(fontSize, 500);
         ctx.textAlign = 'center';
         ctx.globalAlpha = 0.3 * textAlpha;
-        ctx.fillStyle = `rgb(${baseColor})`;
+        ctx.fillStyle = baseColor;
         const previewY =
           top +
           layout.height +
@@ -683,7 +703,7 @@ export default class FumeRenderer {
     const ctx = this.ctx;
     const { width, height } = this;
     const visible = 1 - focus;
-    const centerY = height * LINE_CENTER_RATIO;
+    const centerY = height * (this.options.anchorRatio ?? LINE_CENTER_RATIO);
     const totalHeight =
       overview.entries.length * overview.lineHeight -
       (overview.lineHeight - overview.fontSize * 0.8);
@@ -699,7 +719,7 @@ export default class FumeRenderer {
         ? overview.fontSize
         : overview.fontSize * 0.88;
       ctx.font = this.font(fontSize, isCurrent ? 600 : 500);
-      ctx.fillStyle = isCurrent ? accent : `rgb(${baseColor})`;
+      ctx.fillStyle = isCurrent ? accent : baseColor;
       ctx.globalAlpha = (isCurrent ? 0.82 : isNear ? 0.42 : 0.24) * visible;
       if (isCurrent && this.options.quality !== 'low') {
         ctx.shadowColor = accent;

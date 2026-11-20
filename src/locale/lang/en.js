@@ -318,6 +318,10 @@ export default {
     },
   },
   remote: {
+    style: 'Lyrics Style',
+    styleClassic: 'Classic',
+    styleSentence: 'Single-line',
+    styleGlyph: 'Word-by-word',
     toggle: 'Remote Control Window',
     clickThrough: 'Click-through (let clicks pass through)',
     clickThroughHint:

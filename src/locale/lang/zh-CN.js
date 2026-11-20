@@ -307,6 +307,10 @@ export default {
     },
   },
   remote: {
+    style: '歌词样式',
+    styleClassic: '经典',
+    styleSentence: '单句',
+    styleGlyph: '逐字',
     toggle: '远程控制窗口',
     clickThrough: '点击穿透（鼠标穿过窗口）',
     clickThroughHint: '点击穿透已开启：把鼠标移到右上角控件即可操作',

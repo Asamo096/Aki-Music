@@ -27,6 +27,14 @@ export interface GlyphRendererOptions {
   accent: string;
   theme: 'dark' | 'light';
   quality: GlyphQuality;
+  /** 文字锚点（0..1，默认 0.46） */
+  anchorRatio?: number;
+  /** 透明模式（桌面壁纸层：不画遮罩） */
+  transparent?: boolean;
+  /** 是否显示下一句预览（桌面默认关闭） */
+  showNextPreview?: boolean;
+  /** 正文颜色覆盖（桌面歌词自定义颜色） */
+  textColor?: string;
 }
 
 export interface GlyphDrawOptions {
@@ -145,10 +153,10 @@ export default class GlyphRenderer {
     ctx.textAlign = 'center';
 
     const dark = this.options.theme !== 'light';
-    const baseColor = dark ? '255,255,255' : '26,26,28';
+    const baseColor = this.options.textColor || (dark ? '#ffffff' : '#1a1a1c');
     const accent = this.resolveAccent();
 
-    this.drawBackdrop(dark);
+    if (!this.options.transparent) this.drawBackdrop(dark);
     this.hitRects = [];
 
     if (this.previousLayout) {
@@ -252,7 +260,7 @@ export default class GlyphRenderer {
     ctx.fillStyle = dark ? 'rgba(6,7,11,0.2)' : 'rgba(255,255,255,0.36)';
     ctx.fillRect(0, 0, width, height);
 
-    const centerY = height * LINE_CENTER_RATIO;
+    const centerY = height * (this.options.anchorRatio ?? LINE_CENTER_RATIO);
     const gradient = ctx.createRadialGradient(
       width / 2,
       centerY,
@@ -322,7 +330,7 @@ export default class GlyphRenderer {
     if (!layout) return;
     const { width, height } = this;
     const rowStartX = (width - layout.width) / 2;
-    const centerY = height * LINE_CENTER_RATIO;
+    const centerY = height * (this.options.anchorRatio ?? LINE_CENTER_RATIO);
     const dark = this.options.theme !== 'light';
     const latest = resolveLatestCell(layout, now);
 
@@ -356,7 +364,7 @@ export default class GlyphRenderer {
         rowStartX,
         centerY,
         pose,
-        isLatest ? accent : `rgb(${baseColor})`,
+        isLatest ? accent : baseColor,
         glow,
         dark
       );
@@ -383,7 +391,8 @@ export default class GlyphRenderer {
     const progress = clamp(elapsed / EXIT_DURATION, 0, 1);
     const { width, height } = this;
     const rowStartX = (width - layout.width) / 2;
-    const centerY = height * LINE_CENTER_RATIO - progress * 18;
+    const centerY =
+      height * (this.options.anchorRatio ?? LINE_CENTER_RATIO) - progress * 18;
     const dark = this.options.theme !== 'light';
     const alpha = (1 - progress) * 0.5;
 
@@ -396,16 +405,7 @@ export default class GlyphRenderer {
         scale: 1 - progress * 0.04,
         alpha,
       };
-      this.drawCell(
-        cell,
-        layout,
-        rowStartX,
-        centerY,
-        pose,
-        `rgb(${baseColor})`,
-        0,
-        dark
-      );
+      this.drawCell(cell, layout, rowStartX, centerY, pose, baseColor, 0, dark);
     });
   }
 
@@ -418,7 +418,7 @@ export default class GlyphRenderer {
       const size = Math.max(14, Math.round(layout.fontSize * 0.3));
       ctx.font = this.font(size, 400);
       ctx.globalAlpha = 0.62;
-      ctx.fillStyle = `rgb(${baseColor})`;
+      ctx.fillStyle = baseColor;
       if (dark) {
         ctx.shadowColor = 'rgba(0,0,0,0.4)';
         ctx.shadowBlur = 10;
@@ -426,14 +426,16 @@ export default class GlyphRenderer {
       ctx.fillText(
         layout.translation,
         width / 2,
-        height * LINE_CENTER_RATIO + layout.fontSize * 1.15
+        height * (this.options.anchorRatio ?? LINE_CENTER_RATIO) +
+          layout.fontSize * 1.15
       );
       ctx.shadowBlur = 0;
     }
 
     const nextIndex =
       this.activeIndex >= 0 ? this.activeIndex + 1 : this.findNextIndex(now);
-    const next = this.lines[nextIndex];
+    const next =
+      this.options.showNextPreview === false ? null : this.lines[nextIndex];
     if (next) {
       const text = (next.words || []).map(word => word.text).join('');
       if (text) {

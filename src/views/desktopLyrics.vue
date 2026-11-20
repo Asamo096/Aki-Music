@@ -1,6 +1,20 @@
 <template>
   <div class="desktop-lyrics" :style="rootStyle">
-    <div class="lyrics-band" :class="`position-${position}`">
+    <DesktopCanvasLyrics
+      v-if="visualStyle !== 'classic'"
+      :key="visualStyle"
+      :mode="visualStyle"
+      :lines="lines"
+      :active-index="activeIndex"
+      :time-provider="snapshotTime"
+      :font-family="canvasFontFamily"
+      :font-size="desktopStyle.fontSize"
+      :secondary="secondary"
+      :accent="canvasAccent"
+      :text-color="canvasTextColor"
+      :position="position"
+    />
+    <div v-else class="lyrics-band" :class="`position-${position}`">
       <LyricLines
         :lines="lines"
         :active-index="activeIndex"
@@ -28,6 +42,7 @@
  * 为了保证压在任意壁纸上都能读清，文字带阴影（--lyric-text-shadow）。
  */
 import LyricLines from '@/components/LyricLines.vue';
+import DesktopCanvasLyrics from '@/components/DesktopCanvasLyrics.vue';
 import { ipcRenderer } from '@/utils/electronBridge';
 import {
   CHANNELS,
@@ -42,6 +57,7 @@ export default {
   name: 'DesktopLyrics',
   components: {
     LyricLines,
+    DesktopCanvasLyrics,
   },
   data() {
     return {
@@ -67,6 +83,26 @@ export default {
     },
     position() {
       return this.desktopStyle.position;
+    },
+    /** 快照里解析好的桌面外观（resolvedFamily / colorHex / sweep 不在规范化结果里） */
+    desktopResolved() {
+      return this.payload?.style?.desktop || {};
+    },
+    visualStyle() {
+      return this.desktopStyle.visualStyle;
+    },
+    canvasFontFamily() {
+      return (
+        this.desktopResolved.resolvedFamily ||
+        this.payload?.style?.fontFamily ||
+        'sans-serif'
+      );
+    },
+    canvasAccent() {
+      return this.desktopResolved.sweep || this.payload?.style?.accent || '';
+    },
+    canvasTextColor() {
+      return this.desktopResolved.colorHex || '#ffffff';
     },
     rootStyle() {
       const style = this.payload?.style || {};
