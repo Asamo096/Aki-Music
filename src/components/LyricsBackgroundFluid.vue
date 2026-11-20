@@ -27,6 +27,9 @@
       <div class="blob blob-c" />
     </div>
 
+    <!-- 压暗遮罩：浅色封面会把模糊层变亮，导致白色歌词不可读 -->
+    <div class="veil" :style="veilStyle" />
+
     <!-- 整屏调和层：让多色与封面糊在一起，而不是各说各话 -->
     <div class="tone" :style="toneStyle" />
   </div>
@@ -140,6 +143,12 @@ export default {
     toneStyle() {
       return {
         background: `linear-gradient(to bottom right, ${this.theme.primaryColor}, transparent, ${this.theme.secondaryColor})`,
+      };
+    },
+    veilStyle() {
+      return {
+        backgroundColor: this.theme.backgroundColor,
+        opacity: String(this.theme.veilOpacity),
       };
     },
   },
@@ -334,6 +343,12 @@ export default {
       animation-delay: -17s;
     }
   }
+}
+
+.veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .tone {

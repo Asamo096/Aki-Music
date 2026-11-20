@@ -42,6 +42,10 @@ export interface CoverTheme {
   blobStrength: number;
   /** 参与渲染的调色板（hex，按鲜艳度排序） */
   palette: string[];
+  /** 调色板平均相对亮度 0..1（决定背景压暗力度） */
+  backgroundLuminance: number;
+  /** 覆盖在模糊封面上的暗色遮罩不透明度（浅封面更高，保证白字可读） */
+  veilOpacity: number;
 }
 
 /** 歌词正文与背景的最低对比度（WCAG AA 正文标准） */
@@ -58,6 +62,8 @@ export const FALLBACK_COVER_THEME: CoverTheme = {
   motionDuration: 26,
   blobStrength: 0.5,
   palette: [],
+  backgroundLuminance: 0.2,
+  veilOpacity: 0.3,
 };
 
 /** 情绪档位判定：看调色板的平均饱和度和平均明度 */
@@ -146,6 +152,21 @@ export const buildCoverTheme = (palette: string[]): CoverTheme => {
   const secondaryColor = blobsContrast(secondaryCandidate, backgroundColor);
   const accentColor = blobsContrast(accentCandidate, backgroundColor);
 
+  // 模糊封面层是原图亮度，不是 backgroundColor：浅封面会盖住暗色主题，
+  // 用调色板平均亮度决定一层压暗遮罩，让实际背景接近“保证对比度”的底色。
+  const backgroundLuminance =
+    cleaned.reduce((sum, color) => sum + getRelativeLuminance(color), 0) /
+    cleaned.length;
+  const VEIL_TARGET_LUMINANCE = 0.16;
+  const veilOpacity = Math.min(
+    0.72,
+    Math.max(
+      0.18,
+      (backgroundLuminance - VEIL_TARGET_LUMINANCE) /
+        Math.max(0.12, backgroundLuminance - 0.02)
+    )
+  );
+
   return {
     backgroundColor,
     primaryColor,
@@ -155,6 +176,8 @@ export const buildCoverTheme = (palette: string[]): CoverTheme => {
     motionDuration: duration,
     blobStrength: strength,
     palette: ranked,
+    backgroundLuminance,
+    veilOpacity,
   };
 };
 

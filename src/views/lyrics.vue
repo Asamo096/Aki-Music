@@ -922,6 +922,15 @@ export default {
   /* Fume 模式：Canvas 接管整页歌词，隐藏 DOM 歌词与封面（保留关闭按钮/播放控件） */
   &.fume-mode {
     .left-side,
+    [data-theme='light'] .right-side::before {
+      background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.3) 24%,
+        rgba(255, 255, 255, 0.42) 100%
+      );
+    }
+
     .right-side {
       display: none;
     }
@@ -1233,11 +1242,30 @@ export default {
 }
 
 .right-side {
+  position: relative;
   flex: 1;
   font-weight: 600;
   color: var(--color-text);
   margin-right: 24px;
   z-index: 0;
+
+  /* 歌词区柔和底色：封面很亮时也能读清 */
+  &::before {
+    content: '';
+    position: absolute;
+    top: -12%;
+    bottom: -12%;
+    left: -10%;
+    right: -6%;
+    pointer-events: none;
+    /* 浅色主题下只要一点点压暗；深色主题（fluid 强制深色）才需要强底色 */
+    background: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.1) 24%,
+      rgba(0, 0, 0, 0.18) 100%
+    );
+  }
 
   .lyrics-container {
     height: 100%;

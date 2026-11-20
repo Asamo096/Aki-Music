@@ -53,6 +53,31 @@ export default {
       default: 'dark',
     },
   },
+  watch: {
+    lines() {
+      this.renderer?.setData(this.lines, this.activeIndex);
+    },
+    activeIndex(value) {
+      this.renderer?.setActiveIndex(value);
+    },
+    fontFamily() {
+      this.renderer?.setOptions({ fontFamily: this.fontFamily });
+    },
+    fontSize() {
+      this.renderer?.setOptions({ fontSize: this.fontSize });
+    },
+    secondary() {
+      this.renderer?.setOptions({ secondary: this.secondary });
+    },
+    accent() {
+      this.renderer?.setOptions({ accent: this.accent });
+    },
+    theme(value) {
+      this.renderer?.setOptions({
+        theme: value === 'light' ? 'light' : 'dark',
+      });
+    },
+  },
   mounted() {
     const canvas = this.$refs.canvas;
     if (!canvas) return;
@@ -103,31 +128,6 @@ export default {
     if (typeof window !== 'undefined' && window.__akiFume) {
       delete window.__akiFume;
     }
-  },
-  watch: {
-    lines() {
-      this.renderer?.setData(this.lines, this.activeIndex);
-    },
-    activeIndex(value) {
-      this.renderer?.setActiveIndex(value);
-    },
-    fontFamily() {
-      this.renderer?.setOptions({ fontFamily: this.fontFamily });
-    },
-    fontSize() {
-      this.renderer?.setOptions({ fontSize: this.fontSize });
-    },
-    secondary() {
-      this.renderer?.setOptions({ secondary: this.secondary });
-    },
-    accent() {
-      this.renderer?.setOptions({ accent: this.accent });
-    },
-    theme(value) {
-      this.renderer?.setOptions({
-        theme: value === 'light' ? 'light' : 'dark',
-      });
-    },
   },
   methods: {
     handleResize() {

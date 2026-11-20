@@ -390,17 +390,17 @@ export default {
 
     /* 发光：对整行文字做一次 drop-shadow，行级别的一次滤镜，成本可控 */
     .text {
-      filter: drop-shadow(
-        0 0 14px color-mix(in srgb, currentColor 32%, transparent)
-      );
+      filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.38))
+        drop-shadow(0 0 14px color-mix(in srgb, currentColor 32%, transparent));
     }
 
     /* 音频反应：只放宽当前行的发光半径（--lyric-glow 由运行时写入） */
     .line.active .text {
-      filter: drop-shadow(
-        0 0 calc(8px + var(--lyric-glow, 0) * 30px)
-          color-mix(in srgb, currentColor 46%, transparent)
-      );
+      filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.35))
+        drop-shadow(
+          0 0 calc(8px + var(--lyric-glow, 0) * 30px)
+            color-mix(in srgb, currentColor 46%, transparent)
+        );
     }
   }
 

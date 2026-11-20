@@ -161,6 +161,12 @@ describe('buildCoverTheme', () => {
 
   it('同一调色板结果稳定（可缓存、可复现）', () => {
     const palette = ['#123456', '#654321', '#abcdef'];
+    const light = buildCoverTheme(['#f5f5f5', '#ffffff', '#eeeeee']);
+    const dark = buildCoverTheme(['#101014', '#1c1c22', '#24242c']);
+    expect(light.veilOpacity).toBeGreaterThan(dark.veilOpacity);
+    expect(light.veilOpacity).toBeLessThanOrEqual(0.72);
+    expect(dark.veilOpacity).toBeGreaterThanOrEqual(0.18);
+
     expect(buildCoverTheme(palette)).toEqual(buildCoverTheme(palette));
   });
 
