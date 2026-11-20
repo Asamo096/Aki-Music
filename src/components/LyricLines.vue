@@ -60,6 +60,7 @@ import {
   getLineTransitionTiming,
   getWordProgress,
 } from '@/lyrics';
+import visualRuntime from '@/visual/runtime';
 
 /** 手动滚动后暂停自动跟随的时长（毫秒） */
 const SCROLL_PAUSE_MS = 6000;
@@ -102,6 +103,14 @@ export default {
       type: Function,
       default: null,
     },
+    /**
+     * 是否接音频反应（只从歌词页传 true；桌面歌词/远程窗不传，
+     * 避免壁纸层跟着跑发光滤镜）。
+     */
+    audioReactive: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -109,6 +118,9 @@ export default {
     };
   },
   watch: {
+    audioReactive(enabled) {
+      this.setupAudioSubscription(enabled);
+    },
     activeIndex() {
       this.scheduleSync();
     },
@@ -119,6 +131,9 @@ export default {
   mounted() {
     this.scheduleSync();
     this.rafId = requestAnimationFrame(this.tick);
+    if (this.audioReactive) {
+      this.unsubscribeAudio = visualRuntime.subscribe(this.onAudioFrame);
+    }
     // 视口尺寸变化（副窗口最大化/还原、主窗口缩放）后要重新居中当前行，
     // 否则会保留旧的 scrollTop，当前行被顶到边缘甚至被裁掉。
     if (typeof ResizeObserver !== 'undefined') {
@@ -127,6 +142,10 @@ export default {
     }
   },
   beforeDestroy() {
+    if (this.unsubscribeAudio) {
+      this.unsubscribeAudio();
+      this.unsubscribeAudio = null;
+    }
     if (this.rafId) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
@@ -138,6 +157,18 @@ export default {
     this.detachScrollListeners();
   },
   methods: {
+    setupAudioSubscription(enabled) {
+      if (enabled && !this.unsubscribeAudio) {
+        this.unsubscribeAudio = visualRuntime.subscribe(this.onAudioFrame);
+        return;
+      }
+      if (!enabled && this.unsubscribeAudio) {
+        this.unsubscribeAudio();
+        this.unsubscribeAudio = null;
+        this._audioGlow = 0;
+        this.$el?.style?.setProperty('--lyric-glow', '0');
+      }
+    },
     /** 等本轮 DOM 更新完再同步（watch 回调先于重渲染执行，见 cacheWordEls 注释） */
     scheduleSync() {
       this.$nextTick(() => {
@@ -147,6 +178,22 @@ export default {
     secondaryText(line) {
       if (this.secondary === 'none') return '';
       return getLineSecondaryText(line, this.secondary);
+    },
+    /** 音频帧 → 当前行发光强度（节流：变化 > 0.05 才写 CSS 变量） */
+    onAudioFrame({ audio }) {
+      const settings = this.$store?.state?.settings ?? {};
+      const reduceMotion =
+        settings.visualReduceMotion ||
+        (typeof window !== 'undefined' &&
+          window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+      let level = 0;
+      if (settings.visualAudioReactive !== false && !reduceMotion) {
+        const intensity = Number(settings.visualIntensity ?? 0.6);
+        level = Math.min(1, (audio.power / 255) * intensity);
+      }
+      if (Math.abs(level - (this._audioGlow ?? 0)) < 0.05) return;
+      this._audioGlow = level;
+      this.$el?.style?.setProperty('--lyric-glow', level.toFixed(3));
     },
     /** 行级节奏提示 → CSS 变量（进入/退出过渡时长、是否逐字） */
     lineStyle(line) {
@@ -344,6 +391,14 @@ export default {
     .text {
       filter: drop-shadow(
         0 0 14px color-mix(in srgb, currentColor 32%, transparent)
+      );
+    }
+
+    /* 音频反应：只放宽当前行的发光半径（--lyric-glow 由运行时写入） */
+    .line.active .text {
+      filter: drop-shadow(
+        0 0 calc(12px + var(--lyric-glow, 0) * 18px)
+          color-mix(in srgb, currentColor 38%, transparent)
       );
     }
   }

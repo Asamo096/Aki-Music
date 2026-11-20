@@ -235,6 +235,19 @@ export default {
         high: 'Yüksek Maliyet',
       },
     },
+    visual: {
+      text: 'Görsel',
+      quality: 'Görsel Kalite',
+      qualityHigh: 'Yüksek (60fps)',
+      qualityBalanced: 'Dengeli (40fps)',
+      qualityLow: 'Tasarruf (24fps)',
+      audioReactive: 'Arka Plan ve Şarkı Sözleri Müziğe Tepki Versin',
+      intensity: 'Tepki Yoğunluğu',
+      intensityLow: 'Düşük',
+      intensityNormal: 'Normal',
+      intensityHigh: 'Yüksek',
+      reduceMotion: 'Hareketi Azalt',
+    },
     desktopLyrics: {
       toggle: 'Masaüstü Şarkı Sözleri (Duvar Kağıdı Katmanı)',
       errors: {

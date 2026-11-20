@@ -302,6 +302,7 @@
               :has-word-timing="hasWordTiming"
               :secondary="secondaryLyric"
               :auto-scroll="showLyrics"
+              :audio-reactive="settings.visualAudioReactive"
               @seek="clickLyricLine"
               @menu="openLyricMenu"
             />
@@ -359,6 +360,7 @@ import {
 import { resolveLyricsFontFamily } from '@/settings/fontStacks';
 import { restoreUploadedFont } from '@/settings/customFont';
 import LyricsBackgroundFluid from '@/components/LyricsBackgroundFluid.vue';
+import visualRuntime from '@/visual/runtime';
 import {
   LYRIC_BACKGROUND_STYLES,
   isDarkBackgroundStyle,
@@ -515,6 +517,7 @@ export default {
       this.getCoverColor();
     },
     showLyrics(show) {
+      visualRuntime.setPageVisible(show);
       if (show) {
         // 播放头始终在跑（Touch Bar 需要），这里只需恢复滚动能力
         this.$store.commit('enableScrolling', false);
@@ -527,6 +530,10 @@ export default {
         this.exitFullscreen();
       }
     },
+  },
+  mounted() {
+    // 组件常驻（v-show），运行时要按"歌词页是否显示"启停
+    visualRuntime.setPageVisible(this.showLyrics);
   },
   created() {
     this.getLyric();
@@ -595,6 +602,7 @@ export default {
     this.exitFullscreen();
   },
   destroyed() {
+    visualRuntime.setPageVisible(false);
     if (this.lyricPlayhead) {
       this.lyricPlayhead.stop();
       this.lyricPlayhead = null;

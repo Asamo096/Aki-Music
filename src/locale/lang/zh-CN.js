@@ -232,6 +232,19 @@ export default {
       new: '新',
       cost: { low: '低开销', medium: '中开销', high: '高开销' },
     },
+    visual: {
+      text: '视觉',
+      quality: '视觉质量',
+      qualityHigh: '高（60fps）',
+      qualityBalanced: '均衡（40fps）',
+      qualityLow: '省电（24fps）',
+      audioReactive: '背景与歌词随音乐反应',
+      intensity: '反应强度',
+      intensityLow: '弱',
+      intensityNormal: '标准',
+      intensityHigh: '强',
+      reduceMotion: '减少动态效果',
+    },
     desktopLyrics: {
       toggle: '桌面歌词（壁纸层）',
       errors: {

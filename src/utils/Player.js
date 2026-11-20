@@ -24,6 +24,7 @@ const INDEX_IN_PLAY_NEXT = -1;
  * @enum {string}
  */
 import { UNPLAYABLE_CONDITION } from '@/utils/playbackConditions';
+import audioBus from '@/visual/audioBus';
 
 const ipcRenderer =
   process.env.IS_ELECTRON === true ? electronIpcRenderer : null;
@@ -338,6 +339,8 @@ export default class {
     }
   }
   _playAudioSource(source, autoplay = true) {
+    // 断开上一首的频谱连接（AudioContext 复用，不重建）
+    audioBus.detach();
     Howler.unload();
     this._howler = new Howl({
       src: [source],
@@ -348,6 +351,8 @@ export default class {
         this._nextTrackCallback();
       },
     });
+    // 让视觉层能拿到本首的音频信号（同源 blob 接 analyser，远程用 captureStream）
+    audioBus.attach(this._howler);
     this._howler.on('loaderror', (_, errCode) => {
       // https://developer.mozilla.org/en-US/docs/Web/API/MediaError/code
       // code 3: MEDIA_ERR_DECODE
@@ -841,6 +846,7 @@ export default class {
     if (this._howler?.playing()) return;
 
     this._howler?.play();
+    audioBus.attach(this._howler);
 
     this._howler?.once('play', () => {
       this._howler?.fade(0, this.volume, PLAY_PAUSE_FADE_DURATION);

@@ -321,6 +321,74 @@
         </div>
       </div>
 
+      <h3>{{ $t('settings.visual.text') }}</h3>
+      <div class="item">
+        <div class="left">
+          <div class="title">{{ $t('settings.visual.quality') }}</div>
+        </div>
+        <div class="right">
+          <select v-model="visualQuality">
+            <option value="high">
+              {{ $t('settings.visual.qualityHigh') }}
+            </option>
+            <option value="balanced">
+              {{ $t('settings.visual.qualityBalanced') }}
+            </option>
+            <option value="low">
+              {{ $t('settings.visual.qualityLow') }}
+            </option>
+          </select>
+        </div>
+      </div>
+      <div class="item">
+        <div class="left">
+          <div class="title">{{ $t('settings.visual.audioReactive') }}</div>
+        </div>
+        <div class="right">
+          <div class="toggle">
+            <input
+              id="visual-audio-reactive"
+              v-model="visualAudioReactive"
+              type="checkbox"
+            />
+            <label for="visual-audio-reactive"></label>
+          </div>
+        </div>
+      </div>
+      <div class="item">
+        <div class="left">
+          <div class="title">{{ $t('settings.visual.intensity') }}</div>
+        </div>
+        <div class="right">
+          <select v-model.number="visualIntensity">
+            <option :value="0.35">{{
+              $t('settings.visual.intensityLow')
+            }}</option>
+            <option :value="0.6">
+              {{ $t('settings.visual.intensityNormal') }}
+            </option>
+            <option :value="0.9">
+              {{ $t('settings.visual.intensityHigh') }}
+            </option>
+          </select>
+        </div>
+      </div>
+      <div class="item">
+        <div class="left">
+          <div class="title">{{ $t('settings.visual.reduceMotion') }}</div>
+        </div>
+        <div class="right">
+          <div class="toggle">
+            <input
+              id="visual-reduce-motion"
+              v-model="visualReduceMotion"
+              type="checkbox"
+            />
+            <label for="visual-reduce-motion"></label>
+          </div>
+        </div>
+      </div>
+
       <section v-if="isElectron" class="unm-configuration">
         <h3>UnblockNeteaseMusic</h3>
         <div class="item">
@@ -1119,6 +1187,50 @@ export default {
       set(value) {
         this.$store.commit('updateSettings', {
           key: 'lyricsBackground',
+          value,
+        });
+      },
+    },
+    visualQuality: {
+      get() {
+        return this.settings.visualQuality || 'balanced';
+      },
+      set(value) {
+        this.$store.commit('updateSettings', {
+          key: 'visualQuality',
+          value,
+        });
+      },
+    },
+    visualAudioReactive: {
+      get() {
+        return this.settings.visualAudioReactive !== false;
+      },
+      set(value) {
+        this.$store.commit('updateSettings', {
+          key: 'visualAudioReactive',
+          value,
+        });
+      },
+    },
+    visualIntensity: {
+      get() {
+        return Number(this.settings.visualIntensity ?? 0.6);
+      },
+      set(value) {
+        this.$store.commit('updateSettings', {
+          key: 'visualIntensity',
+          value: Number(value),
+        });
+      },
+    },
+    visualReduceMotion: {
+      get() {
+        return this.settings.visualReduceMotion === true;
+      },
+      set(value) {
+        this.$store.commit('updateSettings', {
+          key: 'visualReduceMotion',
           value,
         });
       },

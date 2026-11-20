@@ -24,6 +24,9 @@
     </div>
 
     <!-- 整屏调和层：让多色与封面糊在一起，而不是各说各话 -->
+    <!-- 音频反应脉冲层（--audio-level 由运行时写入，不参与 Vue 响应式） -->
+    <div class="audio-pulse" aria-hidden="true" />
+
     <div class="tone" :style="toneStyle" />
   </div>
 </template>
@@ -45,6 +48,7 @@
  */
 import { FALLBACK_COVER_THEME } from '@/visual/coverTheme';
 import { extractCoverTheme } from '@/visual/coverThemeExtract';
+import visualRuntime from '@/visual/runtime';
 
 /** 模糊源的最长边（见上方注释第 2 点） */
 const COVER_BLUR_SOURCE_MAX = 384;
@@ -113,6 +117,15 @@ export default {
     };
   },
   computed: {
+    reduceMotion() {
+      return this.$store?.state?.settings?.visualReduceMotion === true;
+    },
+    audioReactiveEnabled() {
+      return (
+        this.$store?.state?.settings?.visualAudioReactive !== false &&
+        !this.reduceMotion
+      );
+    },
     blobStyle() {
       return {
         '--blob-primary': this.theme.primaryColor,
@@ -135,11 +148,55 @@ export default {
         this.loadCover(url);
       },
     },
+    audioReactiveEnabled(enabled) {
+      this.setupAudioSubscription(enabled);
+    },
+  },
+  mounted() {
+    this.setupAudioSubscription(this.audioReactiveEnabled);
   },
   beforeDestroy() {
     clearTimeout(this.pruneTimer);
+    this.setupAudioSubscription(false);
   },
   methods: {
+    setupAudioSubscription(enabled) {
+      if (enabled && !this.unsubscribeAudio) {
+        this.unsubscribeAudio = visualRuntime.subscribe(this.onAudioFrame);
+        return;
+      }
+      if (!enabled && this.unsubscribeAudio) {
+        this.unsubscribeAudio();
+        this.unsubscribeAudio = null;
+        this._audioLevel = 0;
+        this.$el?.style?.setProperty('--audio-level', '0');
+      }
+    },
+    /**
+     * 音频帧 → CSS 变量。只写两个自定义属性，不做响应式更新；
+     * 变化小于阈值就跳过，避免每帧触发样式重算。
+     */
+    onAudioFrame({ audio }) {
+      const settings = this.$store?.state?.settings ?? {};
+      const reduceMotion =
+        settings.visualReduceMotion ||
+        (typeof window !== 'undefined' &&
+          window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+      let level = 0;
+      if (settings.visualAudioReactive !== false && !reduceMotion) {
+        const intensity = Number(settings.visualIntensity ?? 0.6);
+        level = Math.min(1, (audio.power / 255) * intensity);
+      }
+      const next = Number(level.toFixed(3));
+      if (Math.abs(next - (this._audioLevel ?? 0)) < 0.015 && next !== 0) {
+        return;
+      }
+      this._audioLevel = next;
+      const el = this.$el;
+      if (!el?.style) return;
+      el.style.setProperty('--audio-level', String(next));
+      el.style.setProperty('--audio-bass', (audio.bands.bass / 255).toFixed(3));
+    },
     async loadCover(url) {
       if (!url) {
         this.theme = { ...FALLBACK_COVER_THEME };
@@ -226,6 +283,9 @@ export default {
   opacity: calc(0.35 + var(--blob-strength, 0.5) * 0.45);
   mix-blend-mode: screen;
   will-change: transform;
+  transform-origin: center;
+  // 音频能量 → 整体轻微放大（只改 transform，成本低）
+  transform: scale(calc(1 + var(--audio-level, 0) * 0.05));
 
   .blob {
     position: absolute;
@@ -275,6 +335,21 @@ export default {
   }
 }
 
+.audio-pulse {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: calc(var(--audio-level, 0) * 0.5);
+  background: radial-gradient(
+    ellipse at 50% 72%,
+    var(--audio-color, #5b6cff) 0%,
+    transparent 62%
+  );
+  mix-blend-mode: screen;
+  filter: blur(48px);
+  transform: scale(calc(0.9 + var(--audio-level, 0) * 0.3));
+}
+
 .tone {
   position: absolute;
   inset: 0;
@@ -298,6 +373,17 @@ export default {
 @media (prefers-reduced-motion: reduce) {
   .blobs .blob {
     animation: none;
+  }
+}
+
+/* 设置里的“减少动态效果”：停掉漂移与音频缩放 */
+.fluid-background.reduce-motion {
+  .blobs .blob {
+    animation: none;
+  }
+
+  .blobs {
+    transform: none;
   }
 }
 </style>
