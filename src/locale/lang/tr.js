@@ -226,8 +226,8 @@ export default {
       off: 'Kapalı',
       on: 'Açık',
       blur: 'Bulanık Kapak',
-      dynamic: 'Dinamik (Yüksek GPU)',
-      fluid: 'Çok Renkli Akışkan (Kapak Renkleri, En Yüksek Maliyet)',
+      dynamic: 'Dinamik',
+      fluid: 'Çok Renkli Akışkan',
       new: 'Yeni',
       cost: {
         low: 'Düşük Maliyet',
@@ -238,8 +238,8 @@ export default {
     visual: {
       mode: 'Şarkı Sözü Görünümü',
       modeOff: 'Varsayılan Söz Sayfası',
-      modeFume: 'Tek satır (Sinematik, Folia tarzı)',
-      modeGlyph: 'Kelime kelime (Dağılarak)',
+      modeFume: 'Tek satır',
+      modeGlyph: 'Kelime kelime',
       text: 'Görsel',
       quality: 'Görsel Kalite',
       qualityHigh: 'Yüksek (60fps)',

@@ -247,9 +247,7 @@
               {{ $t('settings.lyricsBackground.dynamic') }}
             </option>
             <option value="fluid">
-              {{ $t('settings.lyricsBackground.fluid') }} ({{
-                $t('settings.lyricsBackground.cost.high')
-              }})
+              {{ $t('settings.lyricsBackground.fluid') }}
             </option>
           </select>
         </div>
