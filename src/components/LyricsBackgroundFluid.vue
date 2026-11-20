@@ -1,5 +1,9 @@
 <template>
-  <div class="fluid-background" aria-hidden="true">
+  <div
+    class="fluid-background"
+    :class="{ 'reduce-motion': reduceMotion }"
+    aria-hidden="true"
+  >
     <!-- 封面模糊层：源图先缩到 384px（单块纹理，避免大图分块上传导致的网格闪烁） -->
     <div
       v-for="layer in layers"
@@ -24,9 +28,6 @@
     </div>
 
     <!-- 整屏调和层：让多色与封面糊在一起，而不是各说各话 -->
-    <!-- 音频反应脉冲层（--audio-level 由运行时写入，不参与 Vue 响应式） -->
-    <div class="audio-pulse" aria-hidden="true" />
-
     <div class="tone" :style="toneStyle" />
   </div>
 </template>
@@ -49,6 +50,7 @@
 import { FALLBACK_COVER_THEME } from '@/visual/coverTheme';
 import { extractCoverTheme } from '@/visual/coverThemeExtract';
 import visualRuntime from '@/visual/runtime';
+import { resolveAudioLevel } from '@/visual/intensity';
 
 /** 模糊源的最长边（见上方注释第 2 点） */
 const COVER_BLUR_SOURCE_MAX = 384;
@@ -182,11 +184,11 @@ export default {
         settings.visualReduceMotion ||
         (typeof window !== 'undefined' &&
           window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
-      let level = 0;
-      if (settings.visualAudioReactive !== false && !reduceMotion) {
-        const intensity = Number(settings.visualIntensity ?? 0.6);
-        level = Math.min(1, (audio.power / 255) * intensity);
-      }
+      const level = resolveAudioLevel(audio.power, {
+        enabled: settings.visualAudioReactive !== false,
+        intensity: Number(settings.visualIntensity ?? 0.6),
+        reduceMotion,
+      });
       const next = Number(level.toFixed(3));
       if (Math.abs(next - (this._audioLevel ?? 0)) < 0.015 && next !== 0) {
         return;
@@ -195,7 +197,6 @@ export default {
       const el = this.$el;
       if (!el?.style) return;
       el.style.setProperty('--audio-level', String(next));
-      el.style.setProperty('--audio-bass', (audio.bands.bass / 255).toFixed(3));
     },
     async loadCover(url) {
       if (!url) {
@@ -285,7 +286,7 @@ export default {
   will-change: transform;
   transform-origin: center;
   // 音频能量 → 整体轻微放大（只改 transform，成本低）
-  transform: scale(calc(1 + var(--audio-level, 0) * 0.05));
+  transform: scale(calc(1 + var(--audio-level, 0) * 0.12));
 
   .blob {
     position: absolute;
@@ -333,21 +334,6 @@ export default {
       animation-delay: -17s;
     }
   }
-}
-
-.audio-pulse {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: calc(var(--audio-level, 0) * 0.5);
-  background: radial-gradient(
-    ellipse at 50% 72%,
-    var(--audio-color, #5b6cff) 0%,
-    transparent 62%
-  );
-  mix-blend-mode: screen;
-  filter: blur(48px);
-  transform: scale(calc(0.9 + var(--audio-level, 0) * 0.3));
 }
 
 .tone {

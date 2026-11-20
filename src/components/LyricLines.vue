@@ -61,6 +61,7 @@ import {
   getWordProgress,
 } from '@/lyrics';
 import visualRuntime from '@/visual/runtime';
+import { resolveAudioLevel } from '@/visual/intensity';
 
 /** 手动滚动后暂停自动跟随的时长（毫秒） */
 const SCROLL_PAUSE_MS = 6000;
@@ -186,11 +187,11 @@ export default {
         settings.visualReduceMotion ||
         (typeof window !== 'undefined' &&
           window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
-      let level = 0;
-      if (settings.visualAudioReactive !== false && !reduceMotion) {
-        const intensity = Number(settings.visualIntensity ?? 0.6);
-        level = Math.min(1, (audio.power / 255) * intensity);
-      }
+      const level = resolveAudioLevel(audio.power, {
+        enabled: settings.visualAudioReactive !== false,
+        intensity: Number(settings.visualIntensity ?? 0.6),
+        reduceMotion,
+      });
       if (Math.abs(level - (this._audioGlow ?? 0)) < 0.05) return;
       this._audioGlow = level;
       this.$el?.style?.setProperty('--lyric-glow', level.toFixed(3));
@@ -397,8 +398,8 @@ export default {
     /* 音频反应：只放宽当前行的发光半径（--lyric-glow 由运行时写入） */
     .line.active .text {
       filter: drop-shadow(
-        0 0 calc(12px + var(--lyric-glow, 0) * 18px)
-          color-mix(in srgb, currentColor 38%, transparent)
+        0 0 calc(8px + var(--lyric-glow, 0) * 30px)
+          color-mix(in srgb, currentColor 46%, transparent)
       );
     }
   }

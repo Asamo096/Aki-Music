@@ -39,6 +39,9 @@
         :style="{ background }"
       ></div>
 
+      <!-- 节拍脉冲：与背景风格无关，背景关闭时也能看到 -->
+      <LyricsAudioPulse :color="coverAccent" />
+
       <div class="left-side">
         <div>
           <div v-if="settings.showLyricsTime" class="date">
@@ -360,6 +363,7 @@ import {
 import { resolveLyricsFontFamily } from '@/settings/fontStacks';
 import { restoreUploadedFont } from '@/settings/customFont';
 import LyricsBackgroundFluid from '@/components/LyricsBackgroundFluid.vue';
+import LyricsAudioPulse from '@/components/LyricsAudioPulse.vue';
 import visualRuntime from '@/visual/runtime';
 import {
   LYRIC_BACKGROUND_STYLES,
@@ -390,6 +394,7 @@ export default {
     ContextMenu,
     LyricLines,
     LyricsBackgroundFluid,
+    LyricsAudioPulse,
   },
   data() {
     return {
