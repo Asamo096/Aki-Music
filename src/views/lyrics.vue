@@ -57,6 +57,24 @@
         @seek="clickLyricLine"
       />
 
+      <div v-if="fumeMode" class="fume-controls">
+        <button-icon
+          :title="$t('player.previous')"
+          @click.native="playPrevTrack"
+        >
+          <svg-icon icon-class="previous" />
+        </button-icon>
+        <button-icon
+          :title="$t(player.playing ? 'player.pause' : 'player.play')"
+          @click.native="playOrPause"
+        >
+          <svg-icon :icon-class="player.playing ? 'pause' : 'play'" />
+        </button-icon>
+        <button-icon :title="$t('player.next')" @click.native="playNextTrack">
+          <svg-icon icon-class="next" />
+        </button-icon>
+      </div>
+
       <div class="left-side">
         <div>
           <div v-if="settings.showLyricsTime" class="date">
@@ -922,15 +940,6 @@ export default {
   /* Fume 模式：Canvas 接管整页歌词，隐藏 DOM 歌词与封面（保留关闭按钮/播放控件） */
   &.fume-mode {
     .left-side,
-    [data-theme='light'] .right-side::before {
-      background: linear-gradient(
-        90deg,
-        rgba(255, 255, 255, 0) 0%,
-        rgba(255, 255, 255, 0.3) 24%,
-        rgba(255, 255, 255, 0.42) 100%
-      );
-    }
-
     .right-side {
       display: none;
     }
@@ -1267,6 +1276,16 @@ export default {
     );
   }
 
+  /* 深色主题（fluid 强制深色）下加强歌词区底色 */
+  [data-theme='dark'] &::before {
+    background: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.22) 24%,
+      rgba(0, 0, 0, 0.34) 100%
+    );
+  }
+
   .lyrics-container {
     height: 100%;
     display: flex;
@@ -1283,6 +1302,29 @@ export default {
 
   ::-webkit-scrollbar {
     display: none;
+  }
+}
+
+.fume-controls {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 28px;
+  align-items: center;
+  z-index: 250;
+  opacity: 0.45;
+  transition: opacity 0.25s;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  .svg-icon {
+    width: 26px;
+    height: 26px;
+    color: var(--color-text);
   }
 }
 

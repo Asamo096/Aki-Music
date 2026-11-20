@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /**
- * Fume 模式的文本排版（纯函数，便于单测）。
+ * Fume 模式排版（V2 设计版：单句电影感）。
  *
- * 这一层只负责“把每一行歌词排成可绘制的块 + 相机目标 + 命中测试”，
- * 不接触 Canvas/DOM：字体测量由调用方注入 `measure(text) => width`。
+ * 设计选择（2026-11-20，用户确认）：
+ *   - 一次只呈现当前句，超大字、自动缩放适配宽度
+ *   - 字形级时间：每个字有自己的出现时刻（由词时间分摊；行级歌词线性分摊）
+ *   - 间奏/前奏展示后续 5 句的 overview
  *
- * 与 Folia 的 fume 相比这是简化版：不做 article-level 布局与静态快照，
- * 只保留“竖向歌词流 + 当前行居中 + 逐字打印”的观感。
+ * 这一层是纯函数（字体测量由调用方注入），不接触 Canvas/DOM。
  */
 import type { LyricLine } from '@/lyrics/types';
 import { getLineSecondaryText } from '@/lyrics/utils/text';
@@ -14,42 +15,53 @@ import { getLineSecondaryText } from '@/lyrics/utils/text';
 /** 副行类型（none 表示不显示翻译/音译） */
 export type FumeSecondary = 'translation' | 'romaPronunciation' | 'none';
 
-export interface FumeMeasure {
-  (text: string): number;
+export interface FumeGlyph {
+  char: string;
+  /** 该字的出现时刻（秒） */
+  startTime: number;
+  wordIndex: number;
+  isSpace: boolean;
+}
+
+export interface FumeRow {
+  glyphs: FumeGlyph[];
+  text: string;
+  width: number;
+}
+
+export interface FumeLineLayout {
+  index: number;
+  text: string;
+  translation: string | null;
+  fontSize: number;
+  lineHeight: number;
+  rows: FumeRow[];
+  width: number;
+  height: number;
+}
+
+export interface FumeOverviewEntry {
+  index: number;
+  text: string;
+  tone: 'current' | 'near' | 'far';
+}
+
+export interface FumeOverviewLayout {
+  entries: FumeOverviewEntry[];
+  fontSize: number;
+  lineHeight: number;
 }
 
 export interface FumeLayoutOptions {
-  width: number;
-  height: number;
-  fontSize: number;
-  measure: FumeMeasure;
-  /** 副行来源：translation | romaPronunciation | none */
+  /** 最大可用宽度（CSS 像素） */
+  maxWidth: number;
+  /** 当前句的初始字号 */
+  baseFontSize: number;
+  /** 自动缩放下限 */
+  minFontSize: number;
+  /** measure(text) → 宽度（调用方设置好字体后测量） */
+  measure: (text: string) => number;
   secondary?: FumeSecondary;
-}
-
-export interface FumeLineBox {
-  index: number;
-  line: LyricLine;
-  /** 换行后的文本片段（每段一行） */
-  segments: string[];
-  translation: string | null;
-  /** 块顶部（世界坐标，向下为正） */
-  y: number;
-  height: number;
-  textHeight: number;
-}
-
-export interface FumeLayout {
-  boxes: FumeLineBox[];
-  /** 歌词流总高度 */
-  totalHeight: number;
-  /** 文本列宽度 */
-  columnWidth: number;
-  /** 文本列左边距 */
-  columnX: number;
-  lineHeight: number;
-  segmentHeight: number;
-  translationHeight: number;
 }
 
 const isWideChar = (char: string): boolean => {
@@ -62,183 +74,184 @@ const isWideChar = (char: string): boolean => {
   );
 };
 
-/**
- * 按宽度换行：CJK 可任意断行，拉丁词优先在空格处断；超长单词强制断。
- */
-export const wrapText = (
-  text: string,
+/** 按宽度把一串字符切成多行（仅用于超长句的兜底） */
+export const wrapChars = (
+  chars: string[],
   maxWidth: number,
-  measure: FumeMeasure
-): string[] => {
-  const source = String(text ?? '').replace(/\r/g, '');
-  if (!source.trim()) return [''];
-  if (!Number.isFinite(maxWidth) || maxWidth <= 0) return [source];
-
-  const segments: string[] = [];
-  let current = '';
-
-  const pushCurrent = () => {
-    if (current) segments.push(current);
-    current = '';
-  };
-
-  for (const char of Array.from(source)) {
-    if (char === '\n') {
-      pushCurrent();
-      continue;
+  measure: (text: string) => number
+): string[][] => {
+  const rows: string[][] = [];
+  let current: string[] = [];
+  let currentWidth = 0;
+  for (const char of chars) {
+    const width = measure(char);
+    if (current.length && currentWidth + width > maxWidth) {
+      // 拉丁词尽量在空格处回退
+      const lastSpace = !isWideChar(char) ? current.lastIndexOf(' ') : -1;
+      if (lastSpace > 0) {
+        rows.push(current.slice(0, lastSpace));
+        current = current.slice(lastSpace + 1).concat(char);
+        currentWidth = measure(current.join(''));
+        continue;
+      }
+      rows.push(current);
+      current = [];
+      currentWidth = 0;
     }
-    const candidate = current + char;
-    if (!current || measure(candidate) <= maxWidth) {
-      current = candidate;
-      continue;
-    }
-    // 放不下：拉丁词尽量退到最近的空格；CJK 直接断在字符前
-    const lastSpace = isWideChar(char) ? -1 : current.lastIndexOf(' ');
-    if (lastSpace > 0 && lastSpace > current.length * 0.4) {
-      segments.push(current.slice(0, lastSpace));
-      current = current.slice(lastSpace + 1) + char;
-    } else {
-      segments.push(current);
-      current = char === ' ' ? '' : char;
-    }
+    current.push(char);
+    currentWidth += width;
   }
-  pushCurrent();
-  return segments.length ? segments : [''];
+  if (current.length) rows.push(current);
+  return rows.length ? rows : [['']];
 };
 
-/**
- * 排版整个歌词流。
- * 行距与翻译高度按字号推导，保证不同字号下观感一致。
- */
-export const layoutFumeLines = (
-  lines: LyricLine[],
-  options: FumeLayoutOptions
-): FumeLayout => {
-  const fontSize = Math.max(12, Number(options.fontSize) || 28);
-  const segmentHeight = fontSize * 1.32;
-  const translationHeight = fontSize * 0.62 * 1.3;
-  const lineHeight = segmentHeight + fontSize * 0.55;
-  const columnWidth = Math.max(220, Math.min(options.width * 0.72, 980));
-  const columnX = (options.width - columnWidth) / 2;
-  const secondary = options.secondary ?? 'translation';
-
-  const boxes: FumeLineBox[] = [];
-  let cursorY = 0;
-  lines.forEach((line, index) => {
-    const text = (line.words || []).map(word => word.text).join('');
-    const segments = wrapText(text, columnWidth, options.measure);
-    const translation =
-      secondary === 'none'
-        ? null
-        : getLineSecondaryText(line, secondary) || null;
-    const textHeight = Math.max(1, segments.length) * segmentHeight;
-    const height = textHeight + (translation ? translationHeight : 0);
-    boxes.push({
-      index,
-      line,
-      segments,
-      translation,
-      y: cursorY,
-      height,
-      textHeight,
-    });
-    cursorY += height + lineHeight - segmentHeight;
-  });
-
-  const totalHeight = boxes.length ? cursorY : 0;
-  return {
-    boxes,
-    totalHeight,
-    columnWidth,
-    columnX,
-    lineHeight,
-    segmentHeight,
-    translationHeight,
-  };
-};
-
-/** 相机偏移：让当前行块的中心落在视口中心 */
-export const resolveCameraTarget = (
-  layout: FumeLayout,
-  activeIndex: number,
-  viewportHeight: number
+/** 自动缩放：从 base 逐步降到 min，仍放不下时返回 min（交给换行兜底） */
+export const fitFontSize = (
+  text: string,
+  options: Pick<
+    FumeLayoutOptions,
+    'baseFontSize' | 'minFontSize' | 'maxWidth' | 'measure'
+  >
 ): number => {
-  if (!layout.boxes.length) return 0;
-  const index = Math.min(Math.max(activeIndex, 0), layout.boxes.length - 1);
-  const box = layout.boxes[index];
-  return viewportHeight / 2 - (box.y + box.height / 2);
-};
-
-/** 把屏幕坐标反查成歌词行（用于点击 seek）；命中不到返回 null */
-export const hitTestLine = (
-  layout: FumeLayout,
-  cameraY: number,
-  screenY: number
-): FumeLineBox | null => {
-  const worldY = screenY - cameraY;
-  let low = 0;
-  let high = layout.boxes.length - 1;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    const box = layout.boxes[mid];
-    if (worldY < box.y) {
-      high = mid - 1;
-    } else if (worldY > box.y + box.height) {
-      low = mid + 1;
-    } else {
-      return box;
-    }
+  const base = Math.max(options.minFontSize, options.baseFontSize);
+  if (!text) return base;
+  let size = base;
+  while (
+    size > options.minFontSize &&
+    options.measure(text) > options.maxWidth
+  ) {
+    size -= 2;
   }
-  return null;
+  return size;
 };
 
-/**
- * 当前行每个片段的“揭示进度”（0..1）。
- *
- * 优先用逐字时间：把词的起止时间分摊到字符上，取片段内已揭示字符比例；
- * 没有逐字时间时退化为整行线性进度。
- */
-export const resolveSegmentProgress = (
+/** 逐字时间：词内按字符数均分；行级歌词整行线性均分 */
+export const buildGlyphTimings = (
   line: LyricLine,
-  segments: string[],
-  now: number
-): number[] => {
-  const totalChars = segments.reduce((sum, text) => sum + text.length, 0);
-  if (!totalChars) return segments.map(() => 0);
-  const lineStart = Number(line.startTime) || 0;
-  const lineEnd = Number(line.endTime) || lineStart;
-  const duration = Math.max(0.001, lineEnd - lineStart);
-  const lineProgress = Math.min(1, Math.max(0, (now - lineStart) / duration));
-
+  chars: string[]
+): FumeGlyph[] => {
   const words = (line.words || []).filter(word => word.text);
-  // 行级歌词（只有一个“词”）按整行线性进度，不要假装逐字
-  if (words.length <= 1) return segments.map(() => lineProgress);
+  const lineStart = Number(line.startTime) || 0;
+  const lineEnd = Math.max(lineStart, Number(line.endTime) || lineStart);
 
-  let charCursor = 0;
-  const revealed = new Array(totalChars).fill(false);
-  for (const word of words) {
-    const chars = Array.from(word.text);
+  if (words.length <= 1) {
+    const span = Math.max(0.001, lineEnd - lineStart);
+    return chars.map((char, index) => ({
+      char,
+      startTime: lineStart + (span * index) / Math.max(1, chars.length),
+      wordIndex: 0,
+      isSpace: char === ' ',
+    }));
+  }
+
+  const glyphs: FumeGlyph[] = [];
+  words.forEach((word, wordIndex) => {
+    const wordChars = Array.from(word.text);
     const start = Number(word.startTime) || lineStart;
     const end = Math.max(start, Number(word.endTime) || start);
     const span = Math.max(0.001, end - start);
-    chars.forEach((_, offset) => {
-      const at = start + (span * offset) / Math.max(1, chars.length);
-      if (charCursor + offset < totalChars) {
-        revealed[charCursor + offset] = now >= at;
-      }
+    wordChars.forEach((char, offset) => {
+      glyphs.push({
+        char,
+        startTime: start + (span * offset) / Math.max(1, wordChars.length),
+        wordIndex,
+        isSpace: char === ' ',
+      });
     });
-    charCursor += chars.length;
+  });
+  return glyphs;
+};
+
+/** 当前行排版：自动缩放 + 超长兜底换行 + 逐字时间 */
+export const layoutFumeLine = (
+  line: LyricLine,
+  index: number,
+  options: FumeLayoutOptions
+): FumeLineLayout => {
+  const text = (line.words || []).map(word => word.text).join('');
+  const chars = Array.from(text);
+  const secondary = options.secondary ?? 'translation';
+  const translation =
+    secondary === 'none' ? null : getLineSecondaryText(line, secondary) || null;
+
+  const fontSize = fitFontSize(text, options);
+  const glyphs = buildGlyphTimings(line, chars);
+
+  let rows: string[][];
+  if (options.measure(text) <= options.maxWidth) {
+    rows = [chars];
+  } else {
+    rows = wrapChars(chars, options.maxWidth, options.measure);
   }
 
-  let offset = 0;
-  return segments.map(text => {
-    const length = text.length;
-    if (!length) return 0;
-    let count = 0;
-    for (let index = offset; index < offset + length; index += 1) {
-      if (revealed[index]) count += 1;
-    }
-    offset += length;
-    return count / length;
+  let cursor = 0;
+  const rowModels: FumeRow[] = rows.map(rowChars => {
+    const rowGlyphs = glyphs.slice(cursor, cursor + rowChars.length);
+    cursor += rowChars.length;
+    return {
+      glyphs: rowGlyphs,
+      text: rowChars.join(''),
+      width: options.measure(rowChars.join('')),
+    };
   });
+
+  const lineHeight = Math.round(fontSize * 1.16);
+  return {
+    index,
+    text,
+    translation,
+    fontSize,
+    lineHeight,
+    rows: rowModels,
+    width: options.measure(text),
+    height: Math.max(1, rowModels.length) * lineHeight,
+  };
+};
+
+/**
+ * 间奏/前奏的 overview：取“下一句”开始的 5 句。
+ * @param nextIndex 即将播放的行下标（activeIndex<0 时由调用方按时间求出）
+ */
+export const buildFumeOverview = (
+  lines: LyricLine[],
+  nextIndex: number,
+  options: { fontSize: number; lineHeight: number }
+): FumeOverviewLayout => {
+  const start = Math.max(0, Math.min(nextIndex, Math.max(0, lines.length - 1)));
+  const entries: FumeOverviewEntry[] = [];
+  for (let offset = 0; offset < 5; offset += 1) {
+    const index = start + offset;
+    if (index >= lines.length) break;
+    const text = (lines[index].words || []).map(word => word.text).join('');
+    if (!text) continue;
+    entries.push({
+      index,
+      text,
+      tone: offset === 0 ? 'current' : offset <= 2 ? 'near' : 'far',
+    });
+  }
+  return {
+    entries,
+    fontSize: options.fontSize,
+    lineHeight: options.lineHeight,
+  };
+};
+
+/** 某一行已经揭示到第几个字形（时间有序，可直接用前缀绘制） */
+export const resolveRevealedCount = (row: FumeRow, now: number): number => {
+  let count = 0;
+  for (const glyph of row.glyphs) {
+    if (now >= glyph.startTime) count += 1;
+    else break;
+  }
+  return count;
+};
+
+/** 找当前正在打印的字形（用于笔尖光点） */
+export const resolveCurrentGlyph = (
+  row: FumeRow,
+  now: number
+): FumeGlyph | null => {
+  const count = resolveRevealedCount(row, now);
+  return count > 0 ? row.glyphs[count - 1] : null;
 };

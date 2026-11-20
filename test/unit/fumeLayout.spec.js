@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  hitTestLine,
-  layoutFumeLines,
-  resolveCameraTarget,
-  resolveSegmentProgress,
-  wrapText,
+  buildFumeOverview,
+  buildGlyphTimings,
+  fitFontSize,
+  layoutFumeLine,
+  resolveCurrentGlyph,
+  resolveRevealedCount,
+  wrapChars,
 } from '../../src/visual/fume/layout';
 
 const measure = text => text.length * 10;
@@ -15,85 +17,107 @@ const line = (text, start, end, extra = {}) => ({
   ...extra,
 });
 
-describe('fume layout', () => {
-  it('CJK 按宽度断行', () => {
-    const segments = wrapText('一二三四五六七八九十', 50, measure);
-    expect(segments).toEqual(['一二三四五', '六七八九十']);
+describe('fume layout (cinematic)', () => {
+  it('自动缩放有下限，超长句交给换行兜底', () => {
+    expect(
+      fitFontSize('短句', {
+        baseFontSize: 60,
+        minFontSize: 30,
+        maxWidth: 200,
+        measure,
+      })
+    ).toBe(60);
+    expect(
+      fitFontSize('非常非常非常非常非常非常长的句子', {
+        baseFontSize: 60,
+        minFontSize: 30,
+        maxWidth: 50,
+        measure,
+      })
+    ).toBe(30);
+    const rows = wrapChars(['一', '二', '三', '四', '五'], 20, measure);
+    expect(rows).toEqual([['一', '二'], ['三', '四'], ['五']]);
   });
 
-  it('拉丁词优先在空格处断行', () => {
-    const segments = wrapText('hello world foo', 100, measure);
-    expect(segments).toEqual(['hello', 'world foo']);
-    expect(segments.join(' ')).toBe('hello world foo');
-  });
-
-  it('排版产生正确的块高度与翻译行', () => {
-    const layout = layoutFumeLines(
-      [
-        line('第一行', 0, 2),
-        line('第二行', 2, 4, { translation: 'second line' }),
-        line('第三行', 4, 6),
+  it('逐字时间：词内按字符均分', () => {
+    const lyricLine = {
+      words: [
+        { text: 'ab', startTime: 0, endTime: 2 },
+        { text: 'c', startTime: 2, endTime: 3 },
       ],
+      startTime: 0,
+      endTime: 3,
+    };
+    const glyphs = buildGlyphTimings(lyricLine, ['a', 'b', 'c']);
+    expect(glyphs.map(g => g.startTime)).toEqual([0, 1, 2]);
+    expect(glyphs[2].wordIndex).toBe(1);
+  });
+
+  it('行级歌词按整行线性分摊', () => {
+    const glyphs = buildGlyphTimings(line('abcd', 0, 4), ['a', 'b', 'c', 'd']);
+    expect(glyphs.map(g => g.startTime)).toEqual([0, 1, 2, 3]);
+  });
+
+  it('当前行排版：字号、行高、翻译', () => {
+    const layout = layoutFumeLine(
+      line('今天天气不错', 0, 4, { translation: 'nice weather' }),
+      0,
       {
-        width: 800,
-        height: 600,
-        fontSize: 20,
+        maxWidth: 1000,
+        baseFontSize: 56,
+        minFontSize: 28,
         measure,
         secondary: 'translation',
       }
     );
-    expect(layout.boxes).toHaveLength(3);
-    expect(layout.boxes[1].height).toBeGreaterThan(layout.boxes[0].height);
-    expect(layout.boxes[2].y).toBeGreaterThan(layout.boxes[1].y);
-    expect(layout.totalHeight).toBeGreaterThan(0);
+    expect(layout.fontSize).toBe(56);
+    expect(layout.rows).toHaveLength(1);
+    expect(layout.translation).toBe('nice weather');
+    expect(layout.height).toBeGreaterThan(0);
   });
 
-  it('相机目标把当前行放到视口中心', () => {
-    const layout = layoutFumeLines(
-      [line('a', 0, 1), line('b', 1, 2), line('c', 2, 3)],
-      { width: 800, height: 600, fontSize: 20, measure }
-    );
-    const box = layout.boxes[1];
-    const target = resolveCameraTarget(layout, 1, 600);
-    expect(box.y + box.height / 2 + target).toBeCloseTo(300, 5);
-  });
-
-  it('命中测试按世界坐标找到行', () => {
-    const layout = layoutFumeLines([line('a', 0, 1), line('b', 5, 6)], {
-      width: 800,
-      height: 600,
-      fontSize: 20,
+  it('超长句会换行成多行', () => {
+    const layout = layoutFumeLine(line('一二三四五六七八九十', 0, 4), 0, {
+      maxWidth: 30,
+      baseFontSize: 30,
+      minFontSize: 30,
       measure,
     });
-    const second = layout.boxes[1];
-    const cameraY = 0;
-    const hit = hitTestLine(layout, cameraY, second.y + 1);
-    expect(hit?.line.startTime).toBe(5);
-    expect(hitTestLine(layout, cameraY, -1000)).toBeNull();
+    expect(layout.rows.length).toBeGreaterThan(1);
   });
 
-  it('逐字进度按字符时间分摊', () => {
+  it('overview 取下一句开始的 5 句并标注层次', () => {
+    const lines = Array.from({ length: 8 }, (_, index) =>
+      line(`第${index}句`, index, index + 1)
+    );
+    const overview = buildFumeOverview(lines, 3, {
+      fontSize: 24,
+      lineHeight: 36,
+    });
+    expect(overview.entries).toHaveLength(5);
+    expect(overview.entries[0]).toMatchObject({ index: 3, tone: 'current' });
+    expect(overview.entries[3].tone).toBe('far');
+  });
+
+  it('已揭示字形按时间前缀计数', () => {
     const lyricLine = {
       words: [
-        { text: 'ab', startTime: 0, endTime: 5 },
-        { text: 'cd', startTime: 5, endTime: 10 },
+        { text: 'ab', startTime: 0, endTime: 2 },
+        { text: 'c', startTime: 2, endTime: 3 },
       ],
       startTime: 0,
-      endTime: 10,
+      endTime: 3,
     };
-    const atStart = resolveSegmentProgress(lyricLine, ['abcd'], 0);
-    const midway = resolveSegmentProgress(lyricLine, ['abcd'], 4);
-    const atEnd = resolveSegmentProgress(lyricLine, ['abcd'], 10);
-    expect(atStart[0]).toBe(0.25);
-    expect(midway[0]).toBeCloseTo(0.5, 5);
-    expect(atEnd[0]).toBe(1);
-  });
-
-  it('行级歌词退化为线性进度', () => {
-    const lyricLine = line('整行歌词', 0, 10);
-    expect(resolveSegmentProgress(lyricLine, ['整行歌词'], 5)[0]).toBeCloseTo(
-      0.5,
-      5
-    );
+    const layout = layoutFumeLine(lyricLine, 0, {
+      maxWidth: 1000,
+      baseFontSize: 40,
+      minFontSize: 40,
+      measure,
+    });
+    const row = layout.rows[0];
+    expect(resolveRevealedCount(row, 0)).toBe(1);
+    expect(resolveRevealedCount(row, 2)).toBe(3);
+    expect(resolveCurrentGlyph(row, 0)?.char).toBe('a');
+    expect(resolveCurrentGlyph(row, 0.5)?.char).toBe('a');
   });
 });
