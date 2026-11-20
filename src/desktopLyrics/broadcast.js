@@ -71,6 +71,8 @@ export const publishLyricsPayload = (trackId, data, settings, options = {}) => {
       fontSize: settings?.lyricFontSize || 28,
       secondary: options.secondary || 'translation',
       accent,
+      // 视觉质量档：桌面 Canvas 在高档时按刷新率绘制（其他档位限帧）
+      visualQuality: settings?.visualQuality || 'balanced',
       // 桌面歌词窗（壁纸层）：原始设置 + 解析后的 CSS 值
       desktop: {
         // 原始设置（面板回显与 patch 都基于它：fontFamily 是"字体名"）

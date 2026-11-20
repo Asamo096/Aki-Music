@@ -14,6 +14,7 @@
       :text-color="canvasTextColor"
       :position="position"
       :playing="Boolean(state && state.playing)"
+      :quality="payload?.style?.visualQuality || 'balanced'"
     />
     <div v-else class="lyrics-band" :class="`position-${position}`">
       <LyricLines

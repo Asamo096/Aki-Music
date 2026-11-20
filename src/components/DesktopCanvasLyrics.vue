@@ -31,6 +31,8 @@ export default {
     position: { type: String, default: 'center' },
     /** 播放中按高帧率绘制；暂停时降到低频，省电 */
     playing: { type: Boolean, default: false },
+    /** 视觉质量档：high = 桌面按刷新率绘制（不限帧） */
+    quality: { type: String, default: 'balanced' },
   },
   watch: {
     lines() {
@@ -57,6 +59,9 @@ export default {
     position() {
       this.renderer?.setOptions({ anchorRatio: this.anchorRatio() });
     },
+    quality(value) {
+      this.renderer?.setOptions({ quality: value || 'balanced' });
+    },
   },
   mounted() {
     const canvas = this.$refs.canvas;
@@ -67,7 +72,7 @@ export default {
       secondary: this.secondary,
       accent: this.accent,
       theme: 'dark',
-      quality: 'balanced',
+      quality: this.quality,
       anchorRatio: this.anchorRatio(),
       transparent: true,
       showNextPreview: false,
@@ -140,13 +145,15 @@ export default {
       const loop = ts => {
         this.rafId = requestAnimationFrame(loop);
         if (typeof document !== 'undefined' && document.hidden) return;
-        // 播放中目标约 60–72fps（144Hz 屏上隔帧绘制）；暂停时约 11fps
-        const minDelta = this.playing ? 12 : 90;
+        // high：播放中不限帧（跟随显示器刷新率）；其他档位约 60fps，暂停约 11fps
+        const minDelta = this.playing ? (this.quality === 'high' ? 0 : 12) : 90;
         if (last && ts - last < minDelta) return;
         const dt = last
           ? Math.min(0.1, (ts - last) / 1000)
           : this.playing
-          ? 1 / 60
+          ? this.quality === 'high'
+            ? 1 / 120
+            : 1 / 60
           : 1 / 11;
         last = ts;
         const now = Number(this.timeProvider?.() ?? 0);

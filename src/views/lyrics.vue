@@ -656,6 +656,7 @@ export default {
         this.lyricType,
         this.coverAccent,
         this.settings.desktopLyrics,
+        this.settings.visualQuality,
       ],
       () => this.publishLyricsSnapshot()
     );
