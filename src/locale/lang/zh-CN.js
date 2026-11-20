@@ -235,7 +235,8 @@ export default {
     visual: {
       mode: '歌词呈现模式',
       modeOff: '默认歌词页',
-      modeFume: 'Fume（Canvas 竖向歌词流）',
+      modeFume: '单句歌词（超大字号，Folia 风格）',
+      modeGlyph: '逐字歌词（单字浮出，保留同句）',
       text: '视觉',
       quality: '视觉质量',
       qualityHigh: '高（60fps）',

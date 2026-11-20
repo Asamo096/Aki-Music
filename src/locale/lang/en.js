@@ -259,7 +259,8 @@ export default {
     visual: {
       mode: 'Lyrics Mode',
       modeOff: 'Default Lyrics Page',
-      modeFume: 'Fume (Canvas Vertical Lyrics)',
+      modeFume: 'Single-line (Cinematic, Folia-like)',
+      modeGlyph: 'Word-by-word (Scatter In)',
       text: 'Visual',
       quality: 'Visual Quality',
       qualityHigh: 'High (60fps)',

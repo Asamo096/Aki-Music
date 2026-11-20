@@ -238,7 +238,8 @@ export default {
     visual: {
       mode: 'Şarkı Sözü Görünümü',
       modeOff: 'Varsayılan Söz Sayfası',
-      modeFume: 'Fume (Canvas Dikey Sözler)',
+      modeFume: 'Tek satır (Sinematik, Folia tarzı)',
+      modeGlyph: 'Kelime kelime (Dağılarak)',
       text: 'Görsel',
       quality: 'Görsel Kalite',
       qualityHigh: 'Yüksek (60fps)',

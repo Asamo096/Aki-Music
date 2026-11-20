@@ -247,7 +247,8 @@ export default {
     visual: {
       mode: '歌詞呈現模式',
       modeOff: '預設歌詞頁',
-      modeFume: 'Fume（Canvas 縱向歌詞流）',
+      modeFume: '單句歌詞（超大字号，Folia 風格）',
+      modeGlyph: '逐字歌詞（單字浮出，保留同句）',
       text: '視覺',
       quality: '視覺品質',
       qualityHigh: '高（60fps）',

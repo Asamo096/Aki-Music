@@ -2,7 +2,10 @@
   <transition name="slide-up">
     <div
       class="lyrics-page"
-      :class="{ 'no-lyric': noLyric, 'fume-mode': fumeMode }"
+      :class="{
+        'no-lyric': noLyric,
+        'visual-mode': fumeMode || glyphMode,
+      }"
       :data-theme="theme"
     >
       <div
@@ -43,6 +46,19 @@
       <LyricsAudioPulse :color="coverAccent" />
 
       <!-- Fume 模式（V2）：Canvas 2D 竖向歌词流，替换 DOM 歌词区 -->
+      <GlyphVisualizer
+        v-if="glyphMode"
+        :lines="lines"
+        :active-index="highlightLyricIndex"
+        :secondary="secondaryLyric"
+        :time-provider="visualTimeProvider"
+        :font-family="lyricFontSize.fontFamily"
+        :font-size="Number(settings.lyricFontSize || 28)"
+        :accent="coverAccent"
+        :theme="theme"
+        @seek="clickLyricLine"
+      />
+
       <FumeVisualizer
         v-if="fumeMode"
         :lines="lines"
@@ -57,7 +73,7 @@
         @seek="clickLyricLine"
       />
 
-      <div v-if="fumeMode" class="fume-controls">
+      <div v-if="fumeMode || glyphMode" class="fume-controls">
         <button-icon
           :title="$t('player.previous')"
           @click.native="playPrevTrack"
@@ -338,7 +354,9 @@
               :has-word-timing="hasWordTiming"
               :secondary="secondaryLyric"
               :auto-scroll="showLyrics"
-              :audio-reactive="settings.visualAudioReactive && !fumeMode"
+              :audio-reactive="
+                settings.visualAudioReactive && !fumeMode && !glyphMode
+              "
               @seek="clickLyricLine"
               @menu="openLyricMenu"
             />
@@ -398,6 +416,7 @@ import { restoreUploadedFont } from '@/settings/customFont';
 import LyricsBackgroundFluid from '@/components/LyricsBackgroundFluid.vue';
 import LyricsAudioPulse from '@/components/LyricsAudioPulse.vue';
 import FumeVisualizer from '@/components/FumeVisualizer.vue';
+import GlyphVisualizer from '@/components/GlyphVisualizer.vue';
 import visualRuntime from '@/visual/runtime';
 import {
   LYRIC_BACKGROUND_STYLES,
@@ -430,6 +449,7 @@ export default {
     LyricsBackgroundFluid,
     LyricsAudioPulse,
     FumeVisualizer,
+    GlyphVisualizer,
   },
   data() {
     return {
@@ -462,9 +482,13 @@ export default {
   },
   computed: {
     ...mapState(['player', 'settings', 'showLyrics']),
-    /** Fume 模式：没有歌词时回退到 DOM（保留“无歌词”提示） */
+    /** 单句歌词模式：没有歌词时回退到 DOM（保留“无歌词”提示） */
     fumeMode() {
       return this.settings.visualMode === 'fume' && !this.noLyric;
+    },
+    /** 逐字歌词模式（单字浮出、保留同一句已出现的字） */
+    glyphMode() {
+      return this.settings.visualMode === 'glyph' && !this.noLyric;
     },
     currentTrack() {
       return this.player.currentTrack;
@@ -846,8 +870,8 @@ export default {
     formatTrackTime(value) {
       return formatTrackTime(value);
     },
-    /** Fume 渲染器的时间源：与歌词页/桌面歌词共用同一播放时钟 */
-    fumeTimeProvider() {
+    /** 可视化渲染器的时间源：与歌词页/桌面歌词共用同一播放时钟 */
+    visualTimeProvider() {
       return this.$store.state.player?.seek?.(null, false) ?? 0;
     },
     clickLyricLine(value, startPlay = false) {
@@ -938,7 +962,7 @@ export default {
   clip: rect(auto, auto, auto, auto);
 
   /* Fume 模式：Canvas 接管整页歌词，隐藏 DOM 歌词与封面（保留关闭按钮/播放控件） */
-  &.fume-mode {
+  &.visual-mode {
     .left-side,
     .right-side {
       display: none;

@@ -334,6 +334,9 @@
             <option value="fume">
               {{ $t('settings.visual.modeFume') }}
             </option>
+            <option value="glyph">
+              {{ $t('settings.visual.modeGlyph') }}
+            </option>
           </select>
         </div>
       </div>
