@@ -29,6 +29,8 @@ export default {
     accent: { type: String, default: '' },
     textColor: { type: String, default: '#ffffff' },
     position: { type: String, default: 'center' },
+    /** 播放中按高帧率绘制；暂停时降到低频，省电 */
+    playing: { type: Boolean, default: false },
   },
   watch: {
     lines() {
@@ -138,8 +140,14 @@ export default {
       const loop = ts => {
         this.rafId = requestAnimationFrame(loop);
         if (typeof document !== 'undefined' && document.hidden) return;
-        if (ts - last < 33) return;
-        const dt = last ? Math.min(0.1, (ts - last) / 1000) : 1 / 30;
+        // 播放中目标约 60–72fps（144Hz 屏上隔帧绘制）；暂停时约 11fps
+        const minDelta = this.playing ? 12 : 90;
+        if (last && ts - last < minDelta) return;
+        const dt = last
+          ? Math.min(0.1, (ts - last) / 1000)
+          : this.playing
+          ? 1 / 60
+          : 1 / 11;
         last = ts;
         const now = Number(this.timeProvider?.() ?? 0);
         // 没有音频：用缓慢呼吸让最新字/当前句有一点生命感

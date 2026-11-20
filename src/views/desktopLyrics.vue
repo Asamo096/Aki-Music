@@ -13,6 +13,7 @@
       :accent="canvasAccent"
       :text-color="canvasTextColor"
       :position="position"
+      :playing="Boolean(state && state.playing)"
     />
     <div v-else class="lyrics-band" :class="`position-${position}`">
       <LyricLines
