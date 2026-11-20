@@ -72,6 +72,7 @@ export default {
       this.resizeObserver.observe(canvas);
     }
     canvas.addEventListener('click', this.onClick);
+    window.addEventListener('resize', this.handleResize);
     this.unsubscribe = visualRuntime.subscribe(this.onFrame);
     if (typeof document !== 'undefined' && document.fonts?.load) {
       document.fonts
@@ -92,6 +93,7 @@ export default {
       this.resizeObserver = null;
     }
     this.$refs.canvas?.removeEventListener('click', this.onClick);
+    window.removeEventListener('resize', this.handleResize);
     this.renderer?.dispose();
     this.renderer = null;
     if (typeof window !== 'undefined' && window.__akiGlyph) {

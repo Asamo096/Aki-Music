@@ -128,8 +128,8 @@ export default class GlyphRenderer {
     this.dpr = dpr;
     this.canvas.width = Math.round(width * dpr);
     this.canvas.height = Math.round(height * dpr);
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
+    // 不写 inline width/height：CSS 的 100% 让 canvas 跟随父容器，
+    // 否则窗口放大后 canvas 仍停在旧像素尺寸，遮罩层边缘会露出来。
     this.invalidate();
   }
 

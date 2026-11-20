@@ -102,6 +102,7 @@ export default {
       this.resizeObserver.observe(canvas);
     }
     canvas.addEventListener('click', this.onClick);
+    window.addEventListener('resize', this.handleResize);
     this.unsubscribe = visualRuntime.subscribe(this.onFrame);
     // 自定义/系统字体可能还没加载完：就绪后重建一次排版
     if (typeof document !== 'undefined' && document.fonts?.load) {
@@ -123,6 +124,7 @@ export default {
       this.resizeObserver = null;
     }
     this.$refs.canvas?.removeEventListener('click', this.onClick);
+    window.removeEventListener('resize', this.handleResize);
     this.renderer?.dispose();
     this.renderer = null;
     if (typeof window !== 'undefined' && window.__akiFume) {
