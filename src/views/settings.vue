@@ -324,6 +324,21 @@
       <h3>{{ $t('settings.visual.text') }}</h3>
       <div class="item">
         <div class="left">
+          <div class="title">{{ $t('settings.visual.mode') }}</div>
+        </div>
+        <div class="right">
+          <select v-model="visualMode">
+            <option value="off">
+              {{ $t('settings.visual.modeOff') }}
+            </option>
+            <option value="fume">
+              {{ $t('settings.visual.modeFume') }}
+            </option>
+          </select>
+        </div>
+      </div>
+      <div class="item">
+        <div class="left">
           <div class="title">{{ $t('settings.visual.quality') }}</div>
         </div>
         <div class="right">
@@ -1187,6 +1202,17 @@ export default {
       set(value) {
         this.$store.commit('updateSettings', {
           key: 'lyricsBackground',
+          value,
+        });
+      },
+    },
+    visualMode: {
+      get() {
+        return this.settings.visualMode || 'off';
+      },
+      set(value) {
+        this.$store.commit('updateSettings', {
+          key: 'visualMode',
           value,
         });
       },

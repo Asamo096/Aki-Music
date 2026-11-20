@@ -233,6 +233,9 @@ export default {
       cost: { low: '低开销', medium: '中开销', high: '高开销' },
     },
     visual: {
+      mode: '歌词呈现模式',
+      modeOff: '默认歌词页',
+      modeFume: 'Fume（Canvas 竖向歌词流）',
       text: '视觉',
       quality: '视觉质量',
       qualityHigh: '高（60fps）',

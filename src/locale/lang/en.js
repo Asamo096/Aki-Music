@@ -257,6 +257,9 @@ export default {
       cost: { low: 'Low Cost', medium: 'Medium Cost', high: 'High Cost' },
     },
     visual: {
+      mode: 'Lyrics Mode',
+      modeOff: 'Default Lyrics Page',
+      modeFume: 'Fume (Canvas Vertical Lyrics)',
       text: 'Visual',
       quality: 'Visual Quality',
       qualityHigh: 'High (60fps)',

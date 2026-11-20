@@ -2,7 +2,7 @@
   <transition name="slide-up">
     <div
       class="lyrics-page"
-      :class="{ 'no-lyric': noLyric }"
+      :class="{ 'no-lyric': noLyric, 'fume-mode': fumeMode }"
       :data-theme="theme"
     >
       <div
@@ -41,6 +41,21 @@
 
       <!-- 节拍脉冲：与背景风格无关，背景关闭时也能看到 -->
       <LyricsAudioPulse :color="coverAccent" />
+
+      <!-- Fume 模式（V2）：Canvas 2D 竖向歌词流，替换 DOM 歌词区 -->
+      <FumeVisualizer
+        v-if="fumeMode"
+        :lines="lines"
+        :active-index="highlightLyricIndex"
+        :has-word-timing="hasWordTiming"
+        :secondary="secondaryLyric"
+        :time-provider="fumeTimeProvider"
+        :font-family="lyricFontSize.fontFamily"
+        :font-size="Number(settings.lyricFontSize || 28)"
+        :accent="coverAccent"
+        :theme="theme"
+        @seek="clickLyricLine"
+      />
 
       <div class="left-side">
         <div>
@@ -305,7 +320,7 @@
               :has-word-timing="hasWordTiming"
               :secondary="secondaryLyric"
               :auto-scroll="showLyrics"
-              :audio-reactive="settings.visualAudioReactive"
+              :audio-reactive="settings.visualAudioReactive && !fumeMode"
               @seek="clickLyricLine"
               @menu="openLyricMenu"
             />
@@ -364,6 +379,7 @@ import { resolveLyricsFontFamily } from '@/settings/fontStacks';
 import { restoreUploadedFont } from '@/settings/customFont';
 import LyricsBackgroundFluid from '@/components/LyricsBackgroundFluid.vue';
 import LyricsAudioPulse from '@/components/LyricsAudioPulse.vue';
+import FumeVisualizer from '@/components/FumeVisualizer.vue';
 import visualRuntime from '@/visual/runtime';
 import {
   LYRIC_BACKGROUND_STYLES,
@@ -395,6 +411,7 @@ export default {
     LyricLines,
     LyricsBackgroundFluid,
     LyricsAudioPulse,
+    FumeVisualizer,
   },
   data() {
     return {
@@ -427,6 +444,10 @@ export default {
   },
   computed: {
     ...mapState(['player', 'settings', 'showLyrics']),
+    /** Fume 模式：没有歌词时回退到 DOM（保留“无歌词”提示） */
+    fumeMode() {
+      return this.settings.visualMode === 'fume' && !this.noLyric;
+    },
     currentTrack() {
       return this.player.currentTrack;
     },
@@ -807,6 +828,10 @@ export default {
     formatTrackTime(value) {
       return formatTrackTime(value);
     },
+    /** Fume 渲染器的时间源：与歌词页/桌面歌词共用同一播放时钟 */
+    fumeTimeProvider() {
+      return this.$store.state.player?.seek?.(null, false) ?? 0;
+    },
     clickLyricLine(value, startPlay = false) {
       // TODO: 双击选择还会选中文字，考虑搞个右键菜单复制歌词
       if (window.getSelection().toString().length === 0 && !this.instrumental) {
@@ -893,6 +918,14 @@ export default {
   background: var(--color-body-bg);
   display: flex;
   clip: rect(auto, auto, auto, auto);
+
+  /* Fume 模式：Canvas 接管整页歌词，隐藏 DOM 歌词与封面（保留关闭按钮/播放控件） */
+  &.fume-mode {
+    .left-side,
+    .right-side {
+      display: none;
+    }
+  }
 }
 
 .lyrics-background {

@@ -236,6 +236,9 @@ export default {
       },
     },
     visual: {
+      mode: 'Şarkı Sözü Görünümü',
+      modeOff: 'Varsayılan Söz Sayfası',
+      modeFume: 'Fume (Canvas Dikey Sözler)',
       text: 'Görsel',
       quality: 'Görsel Kalite',
       qualityHigh: 'Yüksek (60fps)',

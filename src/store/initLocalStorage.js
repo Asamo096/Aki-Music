@@ -37,6 +37,8 @@ let localStorage = {
     showLyricsTranslation: true,
     lyricsBackground: true,
     // 视觉深化（V0）：质量档 / 音频反应 / 强度 / 减少动态
+    // V2：visualMode = off（默认歌词页）| fume（Canvas 竖向歌词流）
+    visualMode: 'off',
     visualQuality: 'balanced',
     visualAudioReactive: true,
     visualIntensity: 0.6,

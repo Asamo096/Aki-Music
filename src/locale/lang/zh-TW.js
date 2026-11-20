@@ -245,6 +245,9 @@ export default {
       cost: { low: '低開銷', medium: '中開銷', high: '高開銷' },
     },
     visual: {
+      mode: '歌詞呈現模式',
+      modeOff: '預設歌詞頁',
+      modeFume: 'Fume（Canvas 縱向歌詞流）',
       text: '視覺',
       quality: '視覺品質',
       qualityHigh: '高（60fps）',
