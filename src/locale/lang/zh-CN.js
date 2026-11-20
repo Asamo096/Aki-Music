@@ -235,8 +235,10 @@ export default {
     visual: {
       mode: '歌词呈现模式',
       modeOff: '默认歌词页',
-      modeFume: '单句歌词',
-      modeGlyph: '逐字歌词',
+      modeFume: 'Fume歌词页',
+      fumeStyle: 'Fume 歌词样式',
+      styleSentence: '单句歌词',
+      styleGlyph: '逐字歌词',
       text: '视觉',
       quality: '视觉质量',
       qualityHigh: '高（60fps）',

@@ -332,8 +332,20 @@
             <option value="fume">
               {{ $t('settings.visual.modeFume') }}
             </option>
+          </select>
+        </div>
+      </div>
+      <div v-if="visualMode === 'fume'" class="item">
+        <div class="left">
+          <div class="title">{{ $t('settings.visual.fumeStyle') }}</div>
+        </div>
+        <div class="right">
+          <select v-model="fumeStyle">
+            <option value="sentence">
+              {{ $t('settings.visual.styleSentence') }}
+            </option>
             <option value="glyph">
-              {{ $t('settings.visual.modeGlyph') }}
+              {{ $t('settings.visual.styleGlyph') }}
             </option>
           </select>
         </div>
@@ -1209,12 +1221,27 @@ export default {
     },
     visualMode: {
       get() {
-        return this.settings.visualMode || 'off';
+        // 兼容旧配置：'glyph' 在 UI 上等同 Fume 歌词页
+        return this.settings.visualMode === 'glyph'
+          ? 'fume'
+          : this.settings.visualMode || 'off';
       },
       set(value) {
         this.$store.commit('updateSettings', {
           key: 'visualMode',
           value,
+        });
+      },
+    },
+    fumeStyle: {
+      get() {
+        if (this.settings.visualMode === 'glyph') return 'glyph';
+        return this.settings.fumeStyle === 'glyph' ? 'glyph' : 'sentence';
+      },
+      set(value) {
+        this.$store.commit('updateSettings', {
+          key: 'fumeStyle',
+          value: value === 'glyph' ? 'glyph' : 'sentence',
         });
       },
     },

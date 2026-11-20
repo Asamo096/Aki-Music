@@ -238,8 +238,10 @@ export default {
     visual: {
       mode: 'Şarkı Sözü Görünümü',
       modeOff: 'Varsayılan Söz Sayfası',
-      modeFume: 'Tek satır',
-      modeGlyph: 'Kelime kelime',
+      modeFume: 'Fume Söz Sayfası',
+      fumeStyle: 'Fume Söz Stili',
+      styleSentence: 'Tek satır',
+      styleGlyph: 'Kelime kelime',
       text: 'Görsel',
       quality: 'Görsel Kalite',
       qualityHigh: 'Yüksek (60fps)',

@@ -39,6 +39,8 @@ let localStorage = {
     // 视觉深化（V0）：质量档 / 音频反应 / 强度 / 减少动态
     // V2：visualMode = off（默认歌词页）| fume（Canvas 竖向歌词流）
     visualMode: 'off',
+    /** Fume 歌词页的呈现样式：sentence（单句）/ glyph（逐字） */
+    fumeStyle: 'sentence',
     visualQuality: 'balanced',
     visualAudioReactive: true,
     visualIntensity: 0.6,

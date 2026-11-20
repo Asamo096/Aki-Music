@@ -4,7 +4,7 @@
       class="lyrics-page"
       :class="{
         'no-lyric': noLyric,
-        'visual-mode': fumeMode || glyphMode,
+        'visual-mode': fumePageActive,
       }"
       :data-theme="theme"
     >
@@ -73,7 +73,7 @@
         @seek="clickLyricLine"
       />
 
-      <div v-if="fumeMode || glyphMode" class="fume-controls">
+      <div v-if="fumePageActive" class="fume-controls">
         <button-icon
           :title="$t('player.previous')"
           @click.native="playPrevTrack"
@@ -482,13 +482,26 @@ export default {
   },
   computed: {
     ...mapState(['player', 'settings', 'showLyrics']),
-    /** 单句歌词模式：没有歌词时回退到 DOM（保留“无歌词”提示） */
-    fumeMode() {
-      return this.settings.visualMode === 'fume' && !this.noLyric;
+    /** Fume 歌词页是否激活（两种样式共用；没有歌词时回退 DOM） */
+    fumePageActive() {
+      return (
+        (this.settings.visualMode === 'fume' ||
+          this.settings.visualMode === 'glyph') &&
+        !this.noLyric
+      );
     },
-    /** 逐字歌词模式（单字浮出、保留同一句已出现的字） */
+    /** Fume 的呈现样式（旧配置 visualMode='glyph' 视为逐字） */
+    resolvedFumeStyle() {
+      if (this.settings.visualMode === 'glyph') return 'glyph';
+      return this.settings.fumeStyle === 'glyph' ? 'glyph' : 'sentence';
+    },
+    /** 单句歌词 */
+    fumeMode() {
+      return this.fumePageActive && this.resolvedFumeStyle === 'sentence';
+    },
+    /** 逐字歌词（单字浮出、保留同一句已出现的字） */
     glyphMode() {
-      return this.settings.visualMode === 'glyph' && !this.noLyric;
+      return this.fumePageActive && this.resolvedFumeStyle === 'glyph';
     },
     currentTrack() {
       return this.player.currentTrack;

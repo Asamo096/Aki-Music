@@ -1,4 +1,5 @@
 import initLocalStorage from '@/store/initLocalStorage.js';
+import { migrateVisualSettings } from '@/settings/fume';
 import pkg from '../../package.json';
 
 const updateSetting = () => {
@@ -26,6 +27,11 @@ const updateSetting = () => {
   if (localStorage.getItem('appVersion') === '"0.3.9"') {
     settings.lyricsBackground = true;
   }
+
+  // 旧版本把 Fume 的两种样式直接放在 visualMode 里；统一迁移到 fumeStyle
+  const visual = migrateVisualSettings(settings);
+  settings.visualMode = visual.visualMode;
+  settings.fumeStyle = visual.fumeStyle;
 
   localStorage.setItem('settings', JSON.stringify(settings));
 };

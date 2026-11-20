@@ -259,8 +259,10 @@ export default {
     visual: {
       mode: 'Lyrics Mode',
       modeOff: 'Default Lyrics Page',
-      modeFume: 'Single-line',
-      modeGlyph: 'Word-by-word',
+      modeFume: 'Fume Lyrics Page',
+      fumeStyle: 'Fume Lyrics Style',
+      styleSentence: 'Single-line',
+      styleGlyph: 'Word-by-word',
       text: 'Visual',
       quality: 'Visual Quality',
       qualityHigh: 'High (60fps)',

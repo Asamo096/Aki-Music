@@ -247,8 +247,10 @@ export default {
     visual: {
       mode: '歌詞呈現模式',
       modeOff: '預設歌詞頁',
-      modeFume: '單句歌詞',
-      modeGlyph: '逐字歌詞',
+      modeFume: 'Fume 歌詞頁',
+      fumeStyle: 'Fume 歌詞樣式',
+      styleSentence: '單句歌詞',
+      styleGlyph: '逐字歌詞',
       text: '視覺',
       quality: '視覺品質',
       qualityHigh: '高（60fps）',
