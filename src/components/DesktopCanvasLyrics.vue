@@ -64,10 +64,9 @@ export default {
     quality(value) {
       this.renderer?.setOptions({ quality: value || 'balanced' });
     },
-    layout(value) {
-      this.renderer?.setOptions({
-        layout: value === 'scatter' ? 'scatter' : 'line',
-      });
+    layout() {
+      // 桌面逐字只有一种“直线”（上下交错 + 随机倾斜）
+      this.renderer?.setOptions({ layout: 'line' });
     },
   },
   mounted() {
@@ -84,7 +83,7 @@ export default {
       transparent: true,
       showNextPreview: false,
       textColor: this.textColor,
-      layout: this.layout === 'scatter' ? 'scatter' : 'line',
+      layout: 'line',
     };
     this.renderer =
       this.mode === 'glyph'

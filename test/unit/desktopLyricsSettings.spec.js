@@ -26,7 +26,7 @@ describe('desktop lyrics settings', () => {
     expect(normalizeDesktopLyricsSettings({}).glyphLayout).toBe('line');
     expect(
       normalizeDesktopLyricsSettings({ glyphLayout: 'scatter' }).glyphLayout
-    ).toBe('scatter');
+    ).toBe('line');
     expect(
       normalizeDesktopLyricsSettings({ glyphLayout: 'bogus' }).glyphLayout
     ).toBe('line');

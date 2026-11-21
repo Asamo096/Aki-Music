@@ -108,22 +108,22 @@ describe('glyph layout', () => {
   });
 });
 
-describe('glyph layout scatter', () => {
+describe('glyph layout line (rise/sink)', () => {
   const lyricLine = line('散落效果测试', 0, 3);
 
-  it('散落模式保留最小间隔且位置确定', () => {
+  it('直线排列保留最小间隔且位置确定', () => {
     const a = buildGlyphRow(lyricLine, 0, {
       maxWidth: 1200,
       baseFontSize: 60,
       minFontSize: 30,
-      layout: 'scatter',
+      layout: 'line',
       measure,
     });
     const b = buildGlyphRow(lyricLine, 0, {
       maxWidth: 1200,
       baseFontSize: 60,
       minFontSize: 30,
-      layout: 'scatter',
+      layout: 'line',
       measure,
     });
     expect(a.cells.map(c => c.x)).toEqual(b.cells.map(c => c.x));
@@ -134,12 +134,12 @@ describe('glyph layout scatter', () => {
     expect(a.width).toBeLessThanOrEqual(1200);
   });
 
-  it('散落模式有的字浮上去、有的沉下去，角度不超过 60°', () => {
+  it('直线排列有的字浮上去、有的沉下去，角度不超过 60°', () => {
     const row = buildGlyphRow(line('上下浮动测试', 0, 3), 0, {
       maxWidth: 1600,
       baseFontSize: 60,
       minFontSize: 30,
-      layout: 'scatter',
+      layout: 'line',
       measure,
     });
     const ys = row.cells.map(c => c.y);
@@ -151,19 +151,19 @@ describe('glyph layout scatter', () => {
     expect(Math.max(...tilts)).toBeGreaterThan(Math.PI / 12);
   });
 
-  it('散落模式的纵向/旋转抖动比直线明显', () => {
+  it('直线排列的纵向/旋转抖动比旧刚性线明显', () => {
     const lineMode = buildGlyphRow(lyricLine, 0, {
       maxWidth: 1200,
       baseFontSize: 60,
       minFontSize: 30,
-      layout: 'line',
+      layout: 'plain',
       measure,
     });
     const scatter = buildGlyphRow(lyricLine, 0, {
       maxWidth: 1200,
       baseFontSize: 60,
       minFontSize: 30,
-      layout: 'scatter',
+      layout: 'line',
       measure,
     });
     const maxAbs = row => Math.max(...row.cells.map(c => Math.abs(c.y)));

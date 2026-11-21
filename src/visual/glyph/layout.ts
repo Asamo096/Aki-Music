@@ -15,8 +15,8 @@ import { buildGlyphTimings } from '@/visual/fume/layout';
 
 export type GlyphSecondary = 'translation' | 'romaPronunciation' | 'none';
 
-/** 最终排列方式：line = 一条线；scatter = 随机落点、保留可读间隔 */
-export type GlyphRowLayoutMode = 'line' | 'scatter';
+/** 最终排列方式：plain = 旧刚性直线（仅主歌词页内部使用）；line = 上下交错 + 随机倾斜 */
+export type GlyphRowLayoutMode = 'plain' | 'line';
 
 export interface GlyphCell {
   char: string;
@@ -98,8 +98,8 @@ export const fitGlyphFontSize = (
   > & { layout?: GlyphRowLayoutMode }
 ): number => {
   const chars = Array.from(text);
-  // 散落模式需要更大的平均字距，估算时按 0.65 倍字号留出余量
-  const spacingRatio = options.layout === 'scatter' ? 0.72 : 0.16;
+  // “直线”（上下交错）需要更大的平均字距，估算时按 0.72 倍字号留出余量
+  const spacingRatio = options.layout === 'line' ? 0.72 : 0.16;
   const estimate = (size: number): number => {
     let width = 0;
     for (const char of chars) width += options.measure(char, size);
@@ -125,20 +125,20 @@ export const buildGlyphRow = (
   const translation =
     secondary === 'none' ? null : getLineSecondaryText(line, secondary) || null;
 
-  const layoutMode: GlyphRowLayoutMode = options.layout ?? 'line';
+  const layoutMode: GlyphRowLayoutMode = options.layout ?? 'plain';
   const fontSize = fitGlyphFontSize(text, {
     ...options,
     layout: layoutMode,
   });
   const glyphTimings = buildGlyphTimings(line, chars);
-  const scatter = layoutMode === 'scatter';
+  const freeform = layoutMode === 'line';
 
   const charWidths = chars.map(char => options.measure(char, fontSize));
   const sumWidth = charWidths.reduce((sum, width) => sum + width, 0);
   const minSpacing = Math.max(3, fontSize * 0.16);
   const targetWidth = options.maxWidth * 0.92;
   let spacing = minSpacing;
-  if (!scatter && chars.length > 1 && chars.length <= 10) {
+  if (!freeform && chars.length > 1 && chars.length <= 10) {
     // 短句铺开：字符之间留出明显间隙（参考截图里的大字距）
     const spreadCap = chars.length <= 6 ? fontSize * 2.2 : fontSize * 1.4;
     spacing = clamp(
@@ -150,9 +150,9 @@ export const buildGlyphRow = (
 
   const seedKey = `${line.startTime ?? 0}:${index}:${text}`;
   const cells: GlyphCell[] = [];
-  const scatterBaseGap = fontSize * 0.44;
-  const scatterMinGap = fontSize * 0.26;
-  const scatterMaxGap = fontSize * 1.15;
+  const freeformBaseGap = fontSize * 0.44;
+  const freeformMinGap = fontSize * 0.26;
+  const freeformMaxGap = fontSize * 1.15;
   // 一句话的起伏方向：偶数位/奇数位交错，整体随机从哪一边开始
   const waveSign = hashSeed(`${seedKey}:wave`) > 0.5 ? 1 : -1;
   const MAX_TILT = Math.PI / 3; // 0–60°
@@ -167,15 +167,15 @@ export const buildGlyphRow = (
     const fromSeed = hashSeed(`${seedKey}:from:${charIndex}`);
     const fromYSeed = hashSeed(`${seedKey}:fromY:${charIndex}`);
     const x =
-      scatter && charIndex > 0
+      freeform && charIndex > 0
         ? cursor +
           clamp(
-            scatterBaseGap + (gapSeed - 0.5) * fontSize * 0.6,
-            scatterMinGap,
-            scatterMaxGap
+            freeformBaseGap + (gapSeed - 0.5) * fontSize * 0.6,
+            freeformMinGap,
+            freeformMaxGap
           )
         : cursor;
-    // 散落：奇偶交错地浮上去/沉下去，幅度 0.3–0.85 字号；角度左右随机 0–60°
+    // 直线（上下交错）：奇偶交错地浮上去/沉下去，幅度 0.3–0.85 字号；角度左右随机 0–60°
     const riseDirection = waveSign * (charIndex % 2 === 0 ? 1 : -1);
     const riseAmount = fontSize * (0.3 + Math.abs(riseSeed * 2 - 1) * 0.55);
     cells.push({
@@ -184,10 +184,10 @@ export const buildGlyphRow = (
       isSpace: char === ' ',
       x,
       width: charWidths[charIndex],
-      y: scatter
+      y: freeform
         ? riseDirection * riseAmount
         : (jitterSeed - 0.5) * fontSize * 0.14,
-      rotation: scatter
+      rotation: freeform
         ? (tiltSeed * 2 - 1) * MAX_TILT
         : (jitterSeed * 2 - 1) * 0.035,
       fromX: (fromSeed * 2 - 1) * Math.min(320, options.maxWidth * 0.24),
@@ -198,7 +198,7 @@ export const buildGlyphRow = (
       seed,
     });
     cursor = x + charWidths[charIndex];
-    if (!scatter) cursor += spacing;
+    if (!freeform) cursor += spacing;
   });
 
   return {
@@ -206,7 +206,7 @@ export const buildGlyphRow = (
     text,
     translation,
     fontSize,
-    spacing: scatter ? scatterBaseGap : spacing,
+    spacing: freeform ? freeformBaseGap : spacing,
     width: Math.max(0, cursor),
     cells,
   };
