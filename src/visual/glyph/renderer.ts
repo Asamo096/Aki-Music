@@ -102,7 +102,7 @@ export default class GlyphRenderer {
     if (!ctx) throw new Error('Glyph: 2d context unavailable');
     this.canvas = canvas;
     this.ctx = ctx;
-    this.options = { ...options };
+    this.options = { layout: 'line', ...options };
     this.resize(canvas.clientWidth || 1, canvas.clientHeight || 1);
   }
 
@@ -211,13 +211,17 @@ export default class GlyphRenderer {
 
   private syncActiveLine(now: number): void {
     if (this.activeIndex === this.currentIndex) return;
+    // 间奏/句末：保留刚唱完的那一句及其最终排列，直到下一句开始
+    if (this.activeIndex < 0) {
+      this.currentIndex = this.activeIndex;
+      return;
+    }
     if (this.currentLayout) {
       this.previousLayout = this.currentLayout;
       this.previousExitAt = now;
     }
     this.currentIndex = this.activeIndex;
-    this.currentLayout =
-      this.activeIndex >= 0 ? this.getLayout(this.activeIndex) : null;
+    this.currentLayout = this.getLayout(this.activeIndex);
   }
 
   private font(size: number, weight = 700): string {

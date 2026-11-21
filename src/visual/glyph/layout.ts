@@ -125,7 +125,7 @@ export const buildGlyphRow = (
   const translation =
     secondary === 'none' ? null : getLineSecondaryText(line, secondary) || null;
 
-  const layoutMode: GlyphRowLayoutMode = options.layout ?? 'plain';
+  const layoutMode: GlyphRowLayoutMode = options.layout ?? 'line';
   const fontSize = fitGlyphFontSize(text, {
     ...options,
     layout: layoutMode,
