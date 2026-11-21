@@ -77,6 +77,28 @@ describe('缓存未命中时不发重复请求', () => {
     expect(mocks.request.mock.calls[0][0].url).toBe('/lyric');
   });
 
+  it('getAlbum 缓存新鲜时不发请求', async () => {
+    mocks.albumFromCache.mockResolvedValue({
+      songs: [],
+      lastUpdated: Date.now(),
+    });
+    const result = await getAlbum(789);
+    expect(result.songs).toEqual([]);
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+
+  it('getAlbum 缓存偏旧时后台刷新一次，但仍立即返回缓存', async () => {
+    mocks.albumFromCache.mockResolvedValue({
+      songs: [],
+      lastUpdated: Date.now() - 10 * 60 * 1000,
+    });
+    mocks.request.mockResolvedValue({ songs: [] });
+    const result = await getAlbum(789);
+    expect(result.songs).toEqual([]);
+    await Promise.resolve();
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+  });
+
   it('getAlbum 缓存未命中只发一次', async () => {
     mocks.albumFromCache.mockResolvedValue(undefined);
     mocks.request.mockResolvedValue({ songs: [] });

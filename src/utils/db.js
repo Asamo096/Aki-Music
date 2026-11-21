@@ -366,7 +366,8 @@ export function cacheAlbum(id, album) {
 export function getAlbumFromCache(id) {
   return db.album.get(Number(id)).then(result => {
     if (!result) return undefined;
-    return result.album;
+    // 附带缓存时间，供 api/album.js 判断是否需要后台刷新
+    return { ...result.album, lastUpdated: result.updateTime ?? 0 };
   });
 }
 

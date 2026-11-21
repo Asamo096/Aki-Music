@@ -3,6 +3,9 @@ import { mapTrackPlayableStatus } from '@/utils/common';
 import { cacheAlbum, getAlbumFromCache } from '@/utils/db';
 import { requestKey } from '@/utils/requestCache';
 
+/** 缓存被视为「足够新鲜」的时长，与 song/detail 保持一致 */
+const REVALIDATE_AFTER_MS = 60 * 1000;
+
 /**
  * 获取专辑内容
  * 说明 : 调用此接口 , 传入专辑 id, 可获得专辑内容
@@ -26,8 +29,12 @@ export function getAlbum(id, options = {}) {
 
   return getAlbumFromCache(id).then(result => {
     // 缓存命中直接返回；未命中只发一次（此前会先无条件发一次，
-    // 未命中时再发一次完全相同的请求）
-    return result ?? fetchLatest();
+    // 未命中时再发一次完全相同的请求）。缓存偏旧时后台刷新一次，不阻塞渲染。
+    if (!result) return fetchLatest();
+    if (Date.now() - (result.lastUpdated ?? 0) > REVALIDATE_AFTER_MS) {
+      fetchLatest().catch(() => {});
+    }
+    return result;
   });
 }
 
