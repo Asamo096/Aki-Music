@@ -42,11 +42,28 @@ describe('glyph layout', () => {
     expect(row.cells[4].x).toBeGreaterThan(row.cells[0].x);
   });
 
-  it('逐字时间来自词时间分摊', () => {
+  it('CJK 逐字时间来自词时间分摊', () => {
     const row = buildGlyphRow(
       {
         words: [
-          { text: 'ab', startTime: 0, endTime: 2 },
+          { text: '甲乙', startTime: 0, endTime: 2 },
+          { text: '丙', startTime: 2, endTime: 4 },
+        ],
+        startTime: 0,
+        endTime: 4,
+      },
+      0,
+      { maxWidth: 1000, baseFontSize: 60, minFontSize: 30, measure }
+    );
+    expect(row.cells.map(cell => cell.char)).toEqual(['甲', '乙', '丙']);
+    expect(row.cells.map(cell => cell.startTime)).toEqual([0, 1, 2]);
+  });
+
+  it('英文按空格分词：整词一个单元，词首时间来自首字符', () => {
+    const row = buildGlyphRow(
+      {
+        words: [
+          { text: 'ab ', startTime: 0, endTime: 2 },
           { text: 'c', startTime: 2, endTime: 4 },
         ],
         startTime: 0,
@@ -55,7 +72,8 @@ describe('glyph layout', () => {
       0,
       { maxWidth: 1000, baseFontSize: 60, minFontSize: 30, measure }
     );
-    expect(row.cells.map(cell => cell.startTime)).toEqual([0, 1, 2]);
+    expect(row.cells.map(cell => cell.char)).toEqual(['ab', 'c']);
+    expect(row.cells.map(cell => cell.startTime)).toEqual([0, 2]);
   });
 
   it('每个字的入场姿态可复现（种子确定性）', () => {
@@ -96,16 +114,40 @@ describe('glyph layout', () => {
     expect(easeOutBack(1)).toBeCloseTo(1, 5);
   });
 
-  it('最新的非空格字符会被高亮', () => {
-    const row = buildGlyphRow(line('ab', 0, 1), 0, {
+  it('最新的非空格单元会被高亮（CJK 逐字 / 英文逐词）', () => {
+    const cjk = buildGlyphRow(line('甲乙', 0, 1), 0, {
       maxWidth: 800,
       baseFontSize: 60,
       minFontSize: 30,
       measure,
     });
-    expect(resolveLatestCell(row, -1)).toBeNull();
-    expect(resolveLatestCell(row, 0.2)?.char).toBe('a');
-    expect(resolveLatestCell(row, 1)?.char).toBe('b');
+    expect(resolveLatestCell(cjk, -1)).toBeNull();
+    expect(resolveLatestCell(cjk, 0.2)?.char).toBe('甲');
+    expect(resolveLatestCell(cjk, 1)?.char).toBe('乙');
+
+    const english = buildGlyphRow(line('ab', 0, 1), 0, {
+      maxWidth: 800,
+      baseFontSize: 60,
+      minFontSize: 30,
+      measure,
+    });
+    expect(english.cells.map(cell => cell.char)).toEqual(['ab']);
+    expect(resolveLatestCell(english, 0.2)?.char).toBe('ab');
+  });
+
+  it('中英混排：CJK 逐字，英文按空格成词', () => {
+    const row = buildGlyphRow(line('我爱你 baby', 0, 3), 0, {
+      maxWidth: 1600,
+      baseFontSize: 60,
+      minFontSize: 30,
+      measure,
+    });
+    expect(row.cells.map(cell => cell.char)).toEqual([
+      '我',
+      '爱',
+      '你',
+      'baby',
+    ]);
   });
 });
 

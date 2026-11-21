@@ -116,6 +116,102 @@ export const fitGlyphFontSize = (
   return size;
 };
 
+/** 是否为 CJK 字符（逐字切分；拉丁字母连成的串按词） */
+const isCjkChar = (char: string): boolean => {
+  const code = char.codePointAt(0) ?? 0;
+  return (
+    (code >= 0x2e80 && code <= 0x9fff) ||
+    (code >= 0xf900 && code <= 0xfaff) ||
+    (code >= 0xff00 && code <= 0xffef) ||
+    (code >= 0x3000 && code <= 0x303f)
+  );
+};
+
+export interface GlyphUnit {
+  text: string;
+  /** 在原始行文本中的字符下标（含） */
+  startChar: number;
+  /** 结束下标（不含） */
+  endChar: number;
+  /** 该词前面是否有空格（英文词间距） */
+  spaceBefore: boolean;
+}
+
+/**
+ * 混合分词：CJK 逐字、拉丁连续串按“空格分词”成词。
+ * 空格不产生单元，只把 spaceBefore 记到下一个词上。
+ */
+export const tokenizeGlyphUnits = (text: string): GlyphUnit[] => {
+  const chars = Array.from(text);
+  const units: GlyphUnit[] = [];
+  let buffer = '';
+  let bufferStart = -1;
+  let spaceBefore = false;
+
+  const flush = (endIndex: number) => {
+    if (!buffer) return;
+    units.push({
+      text: buffer,
+      startChar: bufferStart,
+      endChar: endIndex,
+      spaceBefore,
+    });
+    buffer = '';
+    bufferStart = -1;
+    spaceBefore = false;
+  };
+
+  chars.forEach((char, index) => {
+    if (/\s/u.test(char)) {
+      flush(index);
+      spaceBefore = true;
+      return;
+    }
+    if (isCjkChar(char)) {
+      flush(index);
+      units.push({
+        text: char,
+        startChar: index,
+        endChar: index + 1,
+        spaceBefore,
+      });
+      spaceBefore = false;
+      return;
+    }
+    if (!buffer) bufferStart = index;
+    buffer += char;
+  });
+  flush(chars.length);
+  return units;
+};
+
+/** 单元感知的自动缩放：词宽 + 词间距 + 空格宽度都要算进去 */
+const fitUnitFontSize = (
+  units: GlyphUnit[],
+  options: GlyphLayoutOptions,
+  freeform: boolean
+): number => {
+  const spacingRatio = freeform ? 0.72 : 0.16;
+  const estimate = (size: number): number => {
+    let width = 0;
+    let count = 0;
+    let spaces = 0;
+    for (const unit of units) {
+      width += options.measure(unit.text, size);
+      if (unit.spaceBefore) spaces += 1;
+      count += 1;
+    }
+    const spaceWidth = options.measure(' ', size) * spaces;
+    const gap = Math.max(2, size * spacingRatio) * Math.max(0, count - 1);
+    return width + spaceWidth + gap;
+  };
+  let size = Math.max(options.minFontSize, options.baseFontSize);
+  while (size > options.minFontSize && estimate(size) > options.maxWidth) {
+    size -= 2;
+  }
+  return size;
+};
+
 /** 当前行的逐字排版 */
 export const buildGlyphRow = (
   line: LyricLine,
@@ -124,30 +220,35 @@ export const buildGlyphRow = (
 ): GlyphRowLayout => {
   const text = (line.words || []).map(word => word.text).join('');
   const chars = Array.from(text);
+  const units = tokenizeGlyphUnits(text);
   const secondary = options.secondary ?? 'translation';
   const translation =
     secondary === 'none' ? null : getLineSecondaryText(line, secondary) || null;
 
   const layoutMode: GlyphRowLayoutMode = options.layout ?? 'line';
-  const fontSize = fitGlyphFontSize(text, {
-    ...options,
-    layout: layoutMode,
-  });
-  const glyphTimings = buildGlyphTimings(line, chars);
   const freeform = layoutMode === 'line';
+  const fontSize = fitUnitFontSize(units, options, freeform);
+  const charTimings = buildGlyphTimings(line, chars);
+  const lineStart = Number(line.startTime) || 0;
 
-  const charWidths = chars.map(char => options.measure(char, fontSize));
-  const sumWidth = charWidths.reduce((sum, width) => sum + width, 0);
+  const unitModels = units.map(unit => ({
+    ...unit,
+    // 词的出现时间取词首字符的时间（逐词歌词/行级分摊都会给出正确起点）
+    startTime: charTimings[unit.startChar]?.startTime ?? lineStart,
+    width: options.measure(unit.text, fontSize),
+  }));
+  const sumWidth = unitModels.reduce((sum, unit) => sum + unit.width, 0);
+  const spaceCount = unitModels.filter(unit => unit.spaceBefore).length;
+  const spaceWidth = options.measure(' ', fontSize) * spaceCount;
+
   const minSpacing = Math.max(3, fontSize * 0.16);
   const targetWidth = options.maxWidth * 0.92;
   let spacing = minSpacing;
-  if (!freeform && chars.length > 1 && chars.length <= 10) {
-    // 短句铺开：字符之间留出明显间隙（参考截图里的大字距）
-    const spreadCap = chars.length <= 6 ? fontSize * 2.2 : fontSize * 1.4;
+  if (!freeform && unitModels.length > 1 && unitModels.length <= 10) {
     spacing = clamp(
-      (targetWidth - sumWidth) / (chars.length - 1),
+      (targetWidth - sumWidth - spaceWidth) / (unitModels.length - 1),
       minSpacing,
-      spreadCap
+      fontSize * 2.2
     );
   }
 
@@ -156,42 +257,42 @@ export const buildGlyphRow = (
   const freeformBaseGap = fontSize * 0.44;
   const freeformMinGap = fontSize * 0.26;
   const freeformMaxGap = fontSize * 1.15;
-  // 一句话的起伏方向：偶数位/奇数位交错，整体随机从哪一边开始
   const waveSign = hashSeed(`${seedKey}:wave`) > 0.5 ? 1 : -1;
-  // 倾斜：左右均衡（奇偶交错），最大 ±18°，且多数角度更接近 0
   const tiltWave = hashSeed(`${seedKey}:tiltWave`) > 0.5 ? 1 : -1;
   let cursor = 0;
-  chars.forEach((char, charIndex) => {
-    const time = glyphTimings[charIndex]?.startTime ?? 0;
-    const seed = hashSeed(`${seedKey}:${charIndex}:${char}`);
-    const jitterSeed = hashSeed(`${seedKey}:jitter:${charIndex}`);
-    const gapSeed = hashSeed(`${seedKey}:gap:${charIndex}`);
-    const tiltSeed = hashSeed(`${seedKey}:tilt:${charIndex}`);
-    const riseSeed = hashSeed(`${seedKey}:rise:${charIndex}`);
-    const fromSeed = hashSeed(`${seedKey}:from:${charIndex}`);
-    const fromYSeed = hashSeed(`${seedKey}:fromY:${charIndex}`);
-    const x =
-      freeform && charIndex > 0
-        ? cursor +
-          clamp(
+
+  unitModels.forEach((unit, unitIndex) => {
+    const seed = hashSeed(`${seedKey}:${unitIndex}:${unit.text}`);
+    const jitterSeed = hashSeed(`${seedKey}:jitter:${unitIndex}`);
+    const gapSeed = hashSeed(`${seedKey}:gap:${unitIndex}`);
+    const tiltSeed = hashSeed(`${seedKey}:tilt:${unitIndex}`);
+    const riseSeed = hashSeed(`${seedKey}:rise:${unitIndex}`);
+    const fromSeed = hashSeed(`${seedKey}:from:${unitIndex}`);
+    const fromYSeed = hashSeed(`${seedKey}:fromY:${unitIndex}`);
+    const spaceExtra =
+      unit.spaceBefore && unitIndex > 0 ? options.measure(' ', fontSize) : 0;
+    const gap =
+      freeform && unitIndex > 0
+        ? clamp(
             freeformBaseGap + (gapSeed - 0.5) * fontSize * 0.6,
             freeformMinGap,
             freeformMaxGap
           )
-        : cursor;
-    // 直线（上下交错）：奇偶交错地浮上去/沉下去，幅度 0.3–0.85 字号
-    const riseDirection = waveSign * (charIndex % 2 === 0 ? 1 : -1);
+        : spacing;
+    const x = unitIndex === 0 ? 0 : cursor + spaceExtra + gap;
+
+    const riseDirection = waveSign * (unitIndex % 2 === 0 ? 1 : -1);
     const riseAmount = fontSize * (0.3 + Math.abs(riseSeed * 2 - 1) * 0.55);
-    // 倾斜：左右交替，幅度偏向小角度（0–18°）
-    const tiltDirection = tiltWave * (charIndex % 2 === 0 ? 1 : -1);
+    const tiltDirection = tiltWave * (unitIndex % 2 === 0 ? 1 : -1);
     const tiltMagnitude =
       GLYPH_MAX_TILT * (0.12 + 0.88 * Math.pow(tiltSeed, 2));
+
     cells.push({
-      char,
-      startTime: time,
-      isSpace: char === ' ',
+      char: unit.text,
+      startTime: unit.startTime,
+      isSpace: false,
       x,
-      width: charWidths[charIndex],
+      width: unit.width,
       y: freeform
         ? riseDirection * riseAmount
         : (jitterSeed - 0.5) * fontSize * 0.14,
@@ -205,8 +306,7 @@ export const buildGlyphRow = (
       fromScale: 0.45 + fromYSeed * 0.4,
       seed,
     });
-    cursor = x + charWidths[charIndex];
-    if (!freeform) cursor += spacing;
+    cursor = x + unit.width;
   });
 
   return {
@@ -215,7 +315,9 @@ export const buildGlyphRow = (
     translation,
     fontSize,
     spacing: freeform ? freeformBaseGap : spacing,
-    width: Math.max(0, cursor),
+    width: cells.length
+      ? cells[cells.length - 1].x + cells[cells.length - 1].width
+      : 0,
     cells,
   };
 };
