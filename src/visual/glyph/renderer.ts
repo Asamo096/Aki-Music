@@ -431,7 +431,7 @@ export default class GlyphRenderer {
         layout.translation,
         width / 2,
         height * (this.options.anchorRatio ?? LINE_CENTER_RATIO) +
-          layout.fontSize * 1.15
+          layout.fontSize * (this.options.layout === 'scatter' ? 1.55 : 1.15)
       );
       ctx.shadowBlur = 0;
     }

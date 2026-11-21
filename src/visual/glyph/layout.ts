@@ -153,12 +153,17 @@ export const buildGlyphRow = (
   const scatterBaseGap = fontSize * 0.44;
   const scatterMinGap = fontSize * 0.26;
   const scatterMaxGap = fontSize * 1.15;
+  // 一句话的起伏方向：偶数位/奇数位交错，整体随机从哪一边开始
+  const waveSign = hashSeed(`${seedKey}:wave`) > 0.5 ? 1 : -1;
+  const MAX_TILT = Math.PI / 3; // 0–60°
   let cursor = 0;
   chars.forEach((char, charIndex) => {
     const time = glyphTimings[charIndex]?.startTime ?? 0;
     const seed = hashSeed(`${seedKey}:${charIndex}:${char}`);
     const jitterSeed = hashSeed(`${seedKey}:jitter:${charIndex}`);
     const gapSeed = hashSeed(`${seedKey}:gap:${charIndex}`);
+    const tiltSeed = hashSeed(`${seedKey}:tilt:${charIndex}`);
+    const riseSeed = hashSeed(`${seedKey}:rise:${charIndex}`);
     const fromSeed = hashSeed(`${seedKey}:from:${charIndex}`);
     const fromYSeed = hashSeed(`${seedKey}:fromY:${charIndex}`);
     const x =
@@ -170,6 +175,9 @@ export const buildGlyphRow = (
             scatterMaxGap
           )
         : cursor;
+    // 散落：奇偶交错地浮上去/沉下去，幅度 0.3–0.85 字号；角度左右随机 0–60°
+    const riseDirection = waveSign * (charIndex % 2 === 0 ? 1 : -1);
+    const riseAmount = fontSize * (0.3 + Math.abs(riseSeed * 2 - 1) * 0.55);
     cells.push({
       char,
       startTime: time,
@@ -177,10 +185,10 @@ export const buildGlyphRow = (
       x,
       width: charWidths[charIndex],
       y: scatter
-        ? (jitterSeed - 0.5) * fontSize * 0.85
+        ? riseDirection * riseAmount
         : (jitterSeed - 0.5) * fontSize * 0.14,
       rotation: scatter
-        ? (jitterSeed * 2 - 1) * 0.22
+        ? (tiltSeed * 2 - 1) * MAX_TILT
         : (jitterSeed * 2 - 1) * 0.035,
       fromX: (fromSeed * 2 - 1) * Math.min(320, options.maxWidth * 0.24),
       fromY:

@@ -134,6 +134,23 @@ describe('glyph layout scatter', () => {
     expect(a.width).toBeLessThanOrEqual(1200);
   });
 
+  it('散落模式有的字浮上去、有的沉下去，角度不超过 60°', () => {
+    const row = buildGlyphRow(line('上下浮动测试', 0, 3), 0, {
+      maxWidth: 1600,
+      baseFontSize: 60,
+      minFontSize: 30,
+      layout: 'scatter',
+      measure,
+    });
+    const ys = row.cells.map(c => c.y);
+    expect(Math.max(...ys)).toBeGreaterThan(row.fontSize * 0.2);
+    expect(Math.min(...ys)).toBeLessThan(-row.fontSize * 0.2);
+    const tilts = row.cells.map(c => Math.abs(c.rotation));
+    expect(Math.max(...tilts)).toBeGreaterThan(0.5);
+    expect(Math.max(...tilts)).toBeLessThanOrEqual(Math.PI / 3 + 1e-6);
+    expect(Math.max(...tilts)).toBeGreaterThan(Math.PI / 12);
+  });
+
   it('散落模式的纵向/旋转抖动比直线明显', () => {
     const lineMode = buildGlyphRow(lyricLine, 0, {
       maxWidth: 1200,
