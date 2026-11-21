@@ -15,6 +15,7 @@
       :position="position"
       :playing="Boolean(state && state.playing)"
       :quality="payload?.style?.visualQuality || 'balanced'"
+      :layout="desktopStyle.glyphLayout"
     />
     <div v-else class="lyrics-band" :class="`position-${position}`">
       <LyricLines

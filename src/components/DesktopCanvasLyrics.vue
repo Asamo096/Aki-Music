@@ -33,6 +33,8 @@ export default {
     playing: { type: Boolean, default: false },
     /** 视觉质量档：high = 桌面按刷新率绘制（不限帧） */
     quality: { type: String, default: 'balanced' },
+    /** 逐字排列：line / scatter */
+    layout: { type: String, default: 'line' },
   },
   watch: {
     lines() {
@@ -62,6 +64,11 @@ export default {
     quality(value) {
       this.renderer?.setOptions({ quality: value || 'balanced' });
     },
+    layout(value) {
+      this.renderer?.setOptions({
+        layout: value === 'scatter' ? 'scatter' : 'line',
+      });
+    },
   },
   mounted() {
     const canvas = this.$refs.canvas;
@@ -77,6 +84,7 @@ export default {
       transparent: true,
       showNextPreview: false,
       textColor: this.textColor,
+      layout: this.layout === 'scatter' ? 'scatter' : 'line',
     };
     this.renderer =
       this.mode === 'glyph'

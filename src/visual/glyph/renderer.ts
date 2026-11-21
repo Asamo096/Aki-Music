@@ -15,6 +15,7 @@ import {
   resolveLatestCell,
   type GlyphCell,
   type GlyphRowLayout,
+  type GlyphRowLayoutMode,
   type GlyphSecondary,
 } from './layout';
 
@@ -35,6 +36,8 @@ export interface GlyphRendererOptions {
   showNextPreview?: boolean;
   /** 正文颜色覆盖（桌面歌词自定义颜色） */
   textColor?: string;
+  /** 最终排列：line（一条线）/ scatter（随机散落） */
+  layout?: GlyphRowLayoutMode;
 }
 
 export interface GlyphDrawOptions {
@@ -238,6 +241,7 @@ export default class GlyphRenderer {
       baseFontSize: baseFont,
       minFontSize: 30,
       secondary: this.options.secondary,
+      layout: this.options.layout,
       measure: (text, size) => this.measureAt(text, size),
     });
     this.layouts.set(index, layout);

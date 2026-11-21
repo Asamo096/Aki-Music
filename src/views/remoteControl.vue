@@ -96,6 +96,20 @@
           </div>
         </div>
 
+        <div v-if="desktopSetting.visualStyle === 'glyph'" class="row">
+          <span class="label">{{ $t('remote.glyphLayout') }}</span>
+          <div class="segmented">
+            <button
+              v-for="option in glyphLayoutOptions"
+              :key="option.value"
+              :class="{ active: desktopSetting.glyphLayout === option.value }"
+              @click="sendDesktopSetting({ glyphLayout: option.value })"
+            >
+              {{ $t(option.labelKey) }}
+            </button>
+          </div>
+        </div>
+
         <div class="row font-row">
           <span class="label">{{ $t('remote.font') }}</span>
           <FontChooser
@@ -353,6 +367,12 @@ export default {
           labelKey: 'settings.lyricsFont.presetLabels.mono',
           preview: '"Sarasa Mono SC", Consolas, monospace',
         },
+      ];
+    },
+    glyphLayoutOptions() {
+      return [
+        { value: 'line', labelKey: 'remote.glyphLine' },
+        { value: 'scatter', labelKey: 'remote.glyphScatter' },
       ];
     },
     styleOptions() {

@@ -318,6 +318,9 @@ export default {
     },
   },
   remote: {
+    glyphLayout: 'Glyph Layout',
+    glyphLine: 'Line',
+    glyphScatter: 'Scatter',
     style: 'Lyrics Style',
     styleClassic: 'Classic',
     styleSentence: 'Single-line',

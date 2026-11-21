@@ -307,6 +307,9 @@ export default {
     },
   },
   remote: {
+    glyphLayout: '逐字排列',
+    glyphLine: '直线',
+    glyphScatter: '散落',
     style: '歌词样式',
     styleClassic: '经典',
     styleSentence: '单句',

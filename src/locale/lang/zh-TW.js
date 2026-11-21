@@ -304,6 +304,9 @@ export default {
     },
   },
   remote: {
+    glyphLayout: '逐字排列',
+    glyphLine: '直線',
+    glyphScatter: '散落',
     style: '歌詞樣式',
     styleClassic: '經典',
     styleSentence: '單句',

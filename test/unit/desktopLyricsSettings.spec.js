@@ -22,6 +22,16 @@ describe('desktop lyrics settings', () => {
     ).toBe('classic');
   });
 
+  it('逐字排列默认直线，合法值保留、非法值回落', () => {
+    expect(normalizeDesktopLyricsSettings({}).glyphLayout).toBe('line');
+    expect(
+      normalizeDesktopLyricsSettings({ glyphLayout: 'scatter' }).glyphLayout
+    ).toBe('scatter');
+    expect(
+      normalizeDesktopLyricsSettings({ glyphLayout: 'bogus' }).glyphLayout
+    ).toBe('line');
+  });
+
   it('样式不影响位置/字体/字号/颜色的归一化', () => {
     const settings = normalizeDesktopLyricsSettings({
       visualStyle: 'glyph',

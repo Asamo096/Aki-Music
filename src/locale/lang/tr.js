@@ -308,6 +308,9 @@ export default {
     },
   },
   remote: {
+    glyphLayout: 'Harf Düzeni',
+    glyphLine: 'Çizgi',
+    glyphScatter: 'Dağınık',
     style: 'Söz Stili',
     styleClassic: 'Klasik',
     styleSentence: 'Tek satır',

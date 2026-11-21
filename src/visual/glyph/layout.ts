@@ -15,6 +15,9 @@ import { buildGlyphTimings } from '@/visual/fume/layout';
 
 export type GlyphSecondary = 'translation' | 'romaPronunciation' | 'none';
 
+/** 最终排列方式：line = 一条线；scatter = 随机落点、保留可读间隔 */
+export type GlyphRowLayoutMode = 'line' | 'scatter';
+
 export interface GlyphCell {
   char: string;
   startTime: number;
@@ -49,6 +52,8 @@ export interface GlyphLayoutOptions {
   baseFontSize: number;
   minFontSize: number;
   secondary?: GlyphSecondary;
+  /** 最终排列方式（默认 line） */
+  layout?: GlyphRowLayoutMode;
   /** measure(text, fontSize) → 宽度 */
   measure: (text: string, fontSize: number) => number;
 }
@@ -90,13 +95,15 @@ export const fitGlyphFontSize = (
   options: Pick<
     GlyphLayoutOptions,
     'baseFontSize' | 'minFontSize' | 'maxWidth' | 'measure'
-  >
+  > & { layout?: GlyphRowLayoutMode }
 ): number => {
   const chars = Array.from(text);
+  // 散落模式需要更大的平均字距，估算时按 0.65 倍字号留出余量
+  const spacingRatio = options.layout === 'scatter' ? 0.72 : 0.16;
   const estimate = (size: number): number => {
     let width = 0;
     for (const char of chars) width += options.measure(char, size);
-    const spacing = Math.max(2, size * 0.16);
+    const spacing = Math.max(2, size * spacingRatio);
     return width + spacing * Math.max(0, chars.length - 1);
   };
   let size = Math.max(options.minFontSize, options.baseFontSize);
@@ -118,15 +125,20 @@ export const buildGlyphRow = (
   const translation =
     secondary === 'none' ? null : getLineSecondaryText(line, secondary) || null;
 
-  const fontSize = fitGlyphFontSize(text, options);
+  const layoutMode: GlyphRowLayoutMode = options.layout ?? 'line';
+  const fontSize = fitGlyphFontSize(text, {
+    ...options,
+    layout: layoutMode,
+  });
   const glyphTimings = buildGlyphTimings(line, chars);
+  const scatter = layoutMode === 'scatter';
 
   const charWidths = chars.map(char => options.measure(char, fontSize));
   const sumWidth = charWidths.reduce((sum, width) => sum + width, 0);
   const minSpacing = Math.max(3, fontSize * 0.16);
   const targetWidth = options.maxWidth * 0.92;
   let spacing = minSpacing;
-  if (chars.length > 1 && chars.length <= 10) {
+  if (!scatter && chars.length > 1 && chars.length <= 10) {
     // 短句铺开：字符之间留出明显间隙（参考截图里的大字距）
     const spreadCap = chars.length <= 6 ? fontSize * 2.2 : fontSize * 1.4;
     spacing = clamp(
@@ -138,21 +150,38 @@ export const buildGlyphRow = (
 
   const seedKey = `${line.startTime ?? 0}:${index}:${text}`;
   const cells: GlyphCell[] = [];
+  const scatterBaseGap = fontSize * 0.44;
+  const scatterMinGap = fontSize * 0.26;
+  const scatterMaxGap = fontSize * 1.15;
   let cursor = 0;
   chars.forEach((char, charIndex) => {
     const time = glyphTimings[charIndex]?.startTime ?? 0;
     const seed = hashSeed(`${seedKey}:${charIndex}:${char}`);
     const jitterSeed = hashSeed(`${seedKey}:jitter:${charIndex}`);
+    const gapSeed = hashSeed(`${seedKey}:gap:${charIndex}`);
     const fromSeed = hashSeed(`${seedKey}:from:${charIndex}`);
     const fromYSeed = hashSeed(`${seedKey}:fromY:${charIndex}`);
+    const x =
+      scatter && charIndex > 0
+        ? cursor +
+          clamp(
+            scatterBaseGap + (gapSeed - 0.5) * fontSize * 0.6,
+            scatterMinGap,
+            scatterMaxGap
+          )
+        : cursor;
     cells.push({
       char,
       startTime: time,
       isSpace: char === ' ',
-      x: cursor,
+      x,
       width: charWidths[charIndex],
-      y: (jitterSeed - 0.5) * fontSize * 0.14,
-      rotation: (jitterSeed * 2 - 1) * 0.035,
+      y: scatter
+        ? (jitterSeed - 0.5) * fontSize * 0.85
+        : (jitterSeed - 0.5) * fontSize * 0.14,
+      rotation: scatter
+        ? (jitterSeed * 2 - 1) * 0.22
+        : (jitterSeed * 2 - 1) * 0.035,
       fromX: (fromSeed * 2 - 1) * Math.min(320, options.maxWidth * 0.24),
       fromY:
         (fromYSeed > 0.5 ? 1 : -1) * (80 + Math.abs(fromYSeed * 2 - 1) * 170),
@@ -160,7 +189,8 @@ export const buildGlyphRow = (
       fromScale: 0.45 + fromYSeed * 0.4,
       seed,
     });
-    cursor += charWidths[charIndex] + spacing;
+    cursor = x + charWidths[charIndex];
+    if (!scatter) cursor += spacing;
   });
 
   return {
@@ -168,8 +198,8 @@ export const buildGlyphRow = (
     text,
     translation,
     fontSize,
-    spacing,
-    width: Math.max(0, cursor - spacing),
+    spacing: scatter ? scatterBaseGap : spacing,
+    width: Math.max(0, cursor),
     cells,
   };
 };
