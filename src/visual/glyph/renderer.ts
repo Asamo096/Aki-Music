@@ -36,8 +36,12 @@ export interface GlyphRendererOptions {
   showNextPreview?: boolean;
   /** 正文颜色覆盖（桌面歌词自定义颜色） */
   textColor?: string;
-  /** 最终排列：line（一条线）/ scatter（随机散落） */
+  /** 最终排列：plain（旧刚性线，仅主歌词页内部）/ line（上下交错 + 倾斜） */
   layout?: GlyphRowLayoutMode;
+  /** 入场动画时长缩放：桌面用更快的 0.5，主页面用 1 */
+  entryDurationScale?: number;
+  /** 上一句淡出时长（秒） */
+  exitDurationSeconds?: number;
 }
 
 export interface GlyphDrawOptions {
@@ -343,7 +347,11 @@ export default class GlyphRenderer {
     const latest = resolveLatestCell(layout, now);
 
     layout.cells.forEach(cell => {
-      let pose = resolveGlyphPose(cell, now);
+      let pose = resolveGlyphPose(
+        cell,
+        now,
+        this.options.entryDurationScale ?? 1
+      );
       if (!pose) return;
       if (reduceMotion) {
         pose = {
@@ -391,12 +399,13 @@ export default class GlyphRenderer {
   private drawPrevious(now: number, baseColor: string): void {
     const layout = this.previousLayout;
     if (!layout) return;
+    const exitDuration = this.options.exitDurationSeconds ?? EXIT_DURATION;
     const elapsed = now - this.previousExitAt;
-    if (elapsed >= EXIT_DURATION) {
+    if (elapsed >= exitDuration) {
       this.previousLayout = null;
       return;
     }
-    const progress = clamp(elapsed / EXIT_DURATION, 0, 1);
+    const progress = clamp(elapsed / exitDuration, 0, 1);
     const { width, height } = this;
     const rowStartX = (width - layout.width) / 2;
     const centerY =

@@ -84,6 +84,9 @@ export default {
       showNextPreview: false,
       textColor: this.textColor,
       layout: 'line',
+      // 桌面歌词要跟得上唱词：入场约 0.2–0.3s，上一句 0.25s 淡出
+      entryDurationScale: 0.5,
+      exitDurationSeconds: 0.25,
     };
     this.renderer =
       this.mode === 'glyph'

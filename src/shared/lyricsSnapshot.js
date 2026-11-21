@@ -6,7 +6,7 @@
  *   - folia 每 500ms 推一次**完整快照**（含整份 LyricData）。歌词数组通常几十到上百 KB，
  *     每秒推两次纯属浪费；这里拆成两条流：
  *       payload（歌词正文）—— **变更时**才发（换歌 / 歌词加载完成）
- *       state（播放态 + 样式）—— 500ms 心跳，体积只有几十字节
+ *       state（播放态 + 样式）—— 250ms 心跳，体积只有几十字节
  *   - 副窗口自己用 `getSnapshotTime()` 插值时钟（两次心跳之间不跳字），
  *     并自行用 rAF 改 DOM，避免为了进度条/歌词高亮跑 IPC
  *   - 主进程只做缓存与转发，不做任何歌词解析
@@ -15,7 +15,7 @@
 export const CHANNELS = {
   /** 渲染进程 → 主进程：歌词正文（变更时） */
   payload: 'lyrics-payload',
-  /** 渲染进程 → 主进程：播放态与样式（约 500ms） */
+  /** 渲染进程 → 主进程：播放态与样式（约 250ms） */
   state: 'lyrics-state',
   /** 渲染进程 → 主进程：开/关桌面歌词（INVOKE，返回状态） */
   toggle: 'desktop-lyrics:toggle',
@@ -144,7 +144,7 @@ export const isInUnlockHotspot = (point, size) => {
 };
 
 /** state 心跳间隔 */
-export const STATE_INTERVAL_MS = 500;
+export const STATE_INTERVAL_MS = 250;
 /** 壁纸层挂载健康检查间隔 */
 export const WALLPAPER_HEARTBEAT_MS = 5000;
 /** 挂载丢失后的最大重挂次数，超过则自动关窗并回报原因 */

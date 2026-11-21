@@ -226,9 +226,10 @@ export const buildGlyphRow = (
  */
 export const resolveGlyphPose = (
   cell: GlyphCell,
-  now: number
+  now: number,
+  durationScale = 1
 ): GlyphPose | null => {
-  const duration = 0.4 + cell.seed * 0.18;
+  const duration = (0.4 + cell.seed * 0.18) * Math.max(0.1, durationScale);
   const dt = now - cell.startTime;
   if (dt <= 0) return null;
   const progress = clamp(dt / duration, 0, 1);

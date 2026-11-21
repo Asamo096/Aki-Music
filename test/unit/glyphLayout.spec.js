@@ -173,3 +173,22 @@ describe('glyph layout line (rise/sink)', () => {
     expect(maxAbs(scatter)).toBeGreaterThan(maxAbs(lineMode));
   });
 });
+
+describe('glyph entry duration scale', () => {
+  it('桌面用更快的入场：0.3s 时已落位，而标准入场尚未完全落位', () => {
+    const row = buildGlyphRow(line('入场速度', 0, 1), 0, {
+      maxWidth: 1200,
+      baseFontSize: 60,
+      minFontSize: 30,
+      layout: 'line',
+      measure,
+    });
+    const cell = row.cells[0];
+    const fast = resolveGlyphPose(cell, 0.3, 0.5);
+    const slow = resolveGlyphPose(cell, 0.3, 1);
+    expect(fast).not.toBeNull();
+    expect(slow).not.toBeNull();
+    expect(Math.abs(fast.x - cell.x)).toBeLessThan(0.5);
+    expect(Math.abs(slow.x - cell.x)).toBeGreaterThan(1);
+  });
+});
