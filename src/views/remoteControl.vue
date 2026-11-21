@@ -105,6 +105,15 @@
           </div>
         </div>
 
+        <GlyphTuningForm
+          v-if="desktopSetting.visualStyle === 'glyph'"
+          compact
+          :value="desktopSetting.tuning"
+          :fallback="desktopTuningDefaults"
+          @change="onDesktopTuningChange"
+          @reset="onDesktopTuningReset"
+        />
+
         <div class="row font-row">
           <span class="label">{{ $t('remote.font') }}</span>
           <FontChooser
@@ -128,6 +137,20 @@
               @change="sendDesktopSetting({ fontSize: pendingFontSize })"
             />
             <span class="value">{{ pendingFontSize }}px</span>
+          </div>
+        </div>
+
+        <div class="row">
+          <span class="label">{{ $t('remote.textEffect') }}</span>
+          <div class="segmented">
+            <button
+              v-for="option in textEffectOptions"
+              :key="option.value"
+              :class="{ active: desktopSetting.textEffect === option.value }"
+              @click="sendDesktopSetting({ textEffect: option.value })"
+            >
+              {{ $t(option.labelKey) }}
+            </button>
           </div>
         </div>
 
@@ -218,6 +241,11 @@
  */
 import LyricLines from '@/components/LyricLines.vue';
 import FontChooser from '@/components/FontChooser.vue';
+import GlyphTuningForm from '@/components/GlyphTuningForm.vue';
+import {
+  DESKTOP_GLYPH_TUNING_DEFAULTS,
+  normalizeGlyphTuning,
+} from '@/visual/glyph/tuning';
 import { ipcRenderer } from '@/utils/electronBridge';
 import {
   CHANNELS,
@@ -236,7 +264,7 @@ const SPACER_MAXIMIZED = '26vh';
 
 export default {
   name: 'RemoteControl',
-  components: { LyricLines, FontChooser },
+  components: { LyricLines, FontChooser, GlyphTuningForm },
   data() {
     return {
       payload: null,
@@ -363,6 +391,16 @@ export default {
           preview: '"Sarasa Mono SC", Consolas, monospace',
         },
       ];
+    },
+    textEffectOptions() {
+      return [
+        { value: 'shadow', labelKey: 'remote.textShadow' },
+        { value: 'outline', labelKey: 'remote.textOutline' },
+        { value: 'glow', labelKey: 'remote.textGlow' },
+      ];
+    },
+    desktopTuningDefaults() {
+      return DESKTOP_GLYPH_TUNING_DEFAULTS;
     },
     styleOptions() {
       return [
@@ -530,12 +568,23 @@ export default {
       ipcRenderer.send(CHANNELS.remoteCommand, type);
     },
     /** 把桌面歌词外观的一处修改发给主进程（落库后回推快照） */
+    onDesktopTuningChange({ key, value }) {
+      const tuning = normalizeGlyphTuning(
+        { ...this.desktopSetting.tuning, [key]: value },
+        DESKTOP_GLYPH_TUNING_DEFAULTS
+      );
+      this.sendDesktopSetting({ tuning });
+    },
+    onDesktopTuningReset() {
+      this.sendDesktopSetting({
+        tuning: { ...DESKTOP_GLYPH_TUNING_DEFAULTS },
+      });
+    },
     sendDesktopSetting(patch) {
       if (!ipcRenderer) return;
-      ipcRenderer.send(
-        CHANNELS.desktopSettings,
-        normalizeDesktopLyricsSettings({ ...this.desktopSetting, ...patch })
-      );
+      // 只发差异：主窗口负责与现值合并。发完整对象会在连续操作时
+      // 用尚未回推的旧快照覆盖掉上一次修改。
+      ipcRenderer.send(CHANNELS.desktopSettings, patch);
     },
     toggleSettings() {
       this.settingsOpen = !this.settingsOpen;

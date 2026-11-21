@@ -350,6 +350,12 @@
           </select>
         </div>
       </div>
+      <GlyphTuningForm
+        v-if="visualMode === 'fume' && fumeStyle === 'glyph'"
+        :value="settings.fumeTuning"
+        @change="updateFumeTuning"
+        @reset="resetFumeTuning"
+      />
       <div class="item">
         <div class="left">
           <div class="title">{{ $t('settings.visual.quality') }}</div>
@@ -941,6 +947,11 @@ import {
 } from '@/utils/platform';
 import pkg from '../../package.json';
 import LyricsFontPicker from '@/components/LyricsFontPicker.vue';
+import GlyphTuningForm from '@/components/GlyphTuningForm.vue';
+import {
+  DEFAULT_GLYPH_TUNING,
+  normalizeGlyphTuning,
+} from '@/visual/glyph/tuning';
 
 const ipcRenderer =
   process.env.IS_ELECTRON === true ? electronIpcRenderer : null;
@@ -951,6 +962,7 @@ export default {
   name: 'Settings',
   components: {
     LyricsFontPicker,
+    GlyphTuningForm,
   },
   data() {
     return {
@@ -1598,6 +1610,21 @@ export default {
         }
         this.tracksCache.size = bytesToSize(data.bytes);
         this.tracksCache.length = data.length;
+      });
+    },
+    updateFumeTuning({ key, value }) {
+      this.$store.commit('updateSettings', {
+        key: 'fumeTuning',
+        value: normalizeGlyphTuning({
+          ...this.settings.fumeTuning,
+          [key]: value,
+        }),
+      });
+    },
+    resetFumeTuning() {
+      this.$store.commit('updateSettings', {
+        key: 'fumeTuning',
+        value: { ...DEFAULT_GLYPH_TUNING },
       });
     },
     clearCache() {

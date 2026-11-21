@@ -12,6 +12,7 @@
  * 只画视觉层，不解析歌词、不读 store、不管理播放。
  */
 import type { LyricLine } from '@/lyrics/types';
+import { getRelativeLuminance } from '@/visual/themeColorMath';
 import {
   buildFumeOverview,
   layoutFumeLine,
@@ -44,6 +45,8 @@ export interface FumeRendererOptions {
   showOverview?: boolean;
   /** 正文颜色覆盖（桌面歌词自定义颜色） */
   textColor?: string;
+  /** 文字效果：shadow（默认）/ outline（描边）/ glow（柔光） */
+  textEffect?: 'shadow' | 'outline' | 'glow';
 }
 
 export interface FumeDrawOptions {
@@ -610,6 +613,8 @@ export default class FumeRenderer {
     const scale = 0.96 + focus * 0.04;
     const top = centerY - layout.height / 2;
     const textAlpha = focus;
+    const effect = this.options.textEffect || 'shadow';
+    const outlineColor = this.resolveOutlineColor();
 
     ctx.save();
     ctx.translate(width / 2, centerY);
@@ -626,7 +631,20 @@ export default class FumeRenderer {
       // 未揭示：低亮底字
       ctx.globalAlpha = 0.16 * textAlpha;
       ctx.fillStyle = baseColor;
+      if (effect === 'outline') {
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = Math.max(1.2, layout.fontSize * 0.035);
+        ctx.strokeStyle = outlineColor;
+        ctx.strokeText(row.text, rowX, rowY + layout.lineHeight / 2);
+      } else if (effect === 'glow') {
+        ctx.shadowColor = accent;
+        ctx.shadowBlur = 12 + level * 10;
+      } else if (dark) {
+        ctx.shadowColor = 'rgba(0,0,0,0.45)';
+        ctx.shadowBlur = 12;
+      }
       ctx.fillText(row.text, rowX, rowY + layout.lineHeight / 2);
+      ctx.shadowBlur = 0;
 
       const revealed = resolveRevealedCount(row, now);
       if (revealed > 0) {
@@ -636,8 +654,18 @@ export default class FumeRenderer {
           .join('');
         ctx.globalAlpha = 0.96 * textAlpha;
         ctx.fillStyle = accent;
-        ctx.shadowColor = accent;
-        ctx.shadowBlur = this.options.quality === 'low' ? 0 : 12 + level * 36;
+        if (effect === 'outline') {
+          ctx.shadowBlur = 0;
+          ctx.lineWidth = Math.max(1.2, layout.fontSize * 0.035);
+          ctx.strokeStyle = outlineColor;
+          ctx.strokeText(prefix, rowX, rowY + layout.lineHeight / 2);
+        } else {
+          ctx.shadowColor = accent;
+          ctx.shadowBlur =
+            this.options.quality === 'low'
+              ? 0
+              : (effect === 'glow' ? 16 : 12) + level * 36;
+        }
         ctx.fillText(prefix, rowX, rowY + layout.lineHeight / 2);
         ctx.shadowBlur = 0;
 
@@ -671,11 +699,25 @@ export default class FumeRenderer {
       ctx.textAlign = 'center';
       ctx.globalAlpha = 0.68 * textAlpha;
       ctx.fillStyle = baseColor;
+      if (effect === 'outline') {
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = Math.max(1, fontSize * 0.045);
+        ctx.strokeStyle = outlineColor;
+        ctx.strokeText(
+          layout.translation,
+          width / 2,
+          top + layout.height + fontSize * 1.15
+        );
+      } else if (effect === 'glow') {
+        ctx.shadowColor = accent;
+        ctx.shadowBlur = 10;
+      }
       ctx.fillText(
         layout.translation,
         width / 2,
         top + layout.height + fontSize * 1.15
       );
+      ctx.shadowBlur = 0;
     }
 
     // 下一句预览（桌面歌词默认关闭）
@@ -775,6 +817,14 @@ export default class FumeRenderer {
     ctx.fillStyle = fade;
     ctx.fillRect(0, 0, width, height);
     ctx.globalCompositeOperation = 'source-over';
+  }
+
+  private resolveOutlineColor(): string {
+    const color =
+      this.options.textColor ||
+      (this.options.theme === 'light' ? '#1a1a1c' : '#ffffff');
+    const luminance = getRelativeLuminance(color);
+    return luminance > 0.55 ? 'rgba(0,0,0,0.72)' : 'rgba(255,255,255,0.8)';
   }
 
   private resolveAccent(): string {

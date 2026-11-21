@@ -32,6 +32,30 @@ describe('desktop lyrics settings', () => {
     ).toBe('line');
   });
 
+  it('文字效果默认阴影，合法值保留、非法值回落', () => {
+    expect(normalizeDesktopLyricsSettings({}).textEffect).toBe('shadow');
+    expect(
+      normalizeDesktopLyricsSettings({ textEffect: 'outline' }).textEffect
+    ).toBe('outline');
+    expect(
+      normalizeDesktopLyricsSettings({ textEffect: 'glow' }).textEffect
+    ).toBe('glow');
+    expect(
+      normalizeDesktopLyricsSettings({ textEffect: 'bogus' }).textEffect
+    ).toBe('shadow');
+  });
+
+  it('调参默认值独立于主页面，脏值归一化', () => {
+    const defaults = normalizeDesktopLyricsSettings({}).tuning;
+    expect(defaults.entryDurationScale).toBe(0.5);
+    const tuning = normalizeDesktopLyricsSettings({
+      tuning: { tiltMaxDeg: 12, spacingRatio: 100 },
+    }).tuning;
+    expect(tuning.tiltMaxDeg).toBe(12);
+    expect(tuning.spacingRatio).toBe(0.9);
+    expect(tuning.entryDurationScale).toBe(0.5);
+  });
+
   it('样式不影响位置/字体/字号/颜色的归一化', () => {
     const settings = normalizeDesktopLyricsSettings({
       visualStyle: 'glyph',

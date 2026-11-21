@@ -12,6 +12,11 @@
  *   - 主进程只做缓存与转发，不做任何歌词解析
  */
 
+import {
+  DESKTOP_GLYPH_TUNING_DEFAULTS,
+  normalizeGlyphTuning,
+} from '@/visual/glyph/tuning';
+
 export const CHANNELS = {
   /** 渲染进程 → 主进程：歌词正文（变更时） */
   payload: 'lyrics-payload',
@@ -58,10 +63,15 @@ export const DESKTOP_LYRICS_VISUAL_STYLES = ['classic', 'sentence', 'glyph'];
 /** 逐字排列方式：目前只有 line（上下交错 + 随机倾斜的直线） */
 export const DESKTOP_LYRICS_GLYPH_LAYOUTS = ['line'];
 
+/** 桌面歌词文字效果：shadow（默认阴影）/ outline（描边）/ glow（柔光） */
+export const DESKTOP_LYRICS_TEXT_EFFECTS = ['shadow', 'outline', 'glow'];
+
 export const DESKTOP_LYRICS_DEFAULTS = {
   position: 'center',
+  textEffect: 'shadow',
   visualStyle: 'classic',
   glyphLayout: 'line',
+  tuning: { ...DESKTOP_GLYPH_TUNING_DEFAULTS },
   fontPreset: 'inherit',
   /** fontPreset === 'custom' 时使用的字体族名 */
   fontFamily: null,
@@ -94,6 +104,10 @@ export const normalizeDesktopLyricsSettings = (value = {}) => {
       : DESKTOP_LYRICS_DEFAULTS.visualStyle,
     // 旧的 scatter 值与现在的“直线”是同一效果，统一归一到 line
     glyphLayout: 'line',
+    textEffect: DESKTOP_LYRICS_TEXT_EFFECTS.includes(source.textEffect)
+      ? source.textEffect
+      : DESKTOP_LYRICS_DEFAULTS.textEffect,
+    tuning: normalizeGlyphTuning(source.tuning, DESKTOP_GLYPH_TUNING_DEFAULTS),
     fontPreset: DESKTOP_LYRICS_FONT_PRESETS.includes(source.fontPreset)
       ? source.fontPreset
       : DESKTOP_LYRICS_DEFAULTS.fontPreset,

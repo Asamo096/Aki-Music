@@ -24,7 +24,6 @@ import { BrowserWindow, ipcMain, screen } from 'electron';
 import {
   CHANNELS,
   CLICK_THROUGH_POLL_MS,
-  normalizeDesktopLyricsSettings,
   WINDOW_QUERY_KEY,
   WINDOW_REMOTE,
   isInUnlockHotspot,
@@ -378,10 +377,8 @@ export const initRemoteIpc = ({ mainWindow, preload }) => {
   ipcMain.on(CHANNELS.desktopSettings, (event, patch) => {
     if (!win || win.isDestroyed() || event.sender !== win.webContents) return;
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    mainWindow.webContents.send(
-      CHANNELS.desktopSettings,
-      normalizeDesktopLyricsSettings(patch)
-    );
+    // 原样转发差异；主窗口持有当前值并负责合并/归一化。
+    mainWindow.webContents.send(CHANNELS.desktopSettings, patch);
   });
 
   ipcMain.on(CHANNELS.remoteCommand, (event, command) => {

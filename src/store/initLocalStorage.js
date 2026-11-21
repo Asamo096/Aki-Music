@@ -1,5 +1,9 @@
 import { playlistCategories } from '@/utils/staticData';
 import shortcuts from '@/utils/shortcuts';
+import {
+  DEFAULT_GLYPH_TUNING,
+  DESKTOP_GLYPH_TUNING_DEFAULTS,
+} from '@/visual/glyph/tuning';
 
 console.debug('[debug][initLocalStorage.js]');
 const enabledPlaylistCategories = playlistCategories
@@ -23,6 +27,10 @@ let localStorage = {
     // 真值保存在主窗口的设置里，副窗口只按 IPC 下发的快照渲染。
     desktopLyrics: {
       position: 'center',
+      visualStyle: 'classic',
+      glyphLayout: 'line',
+      textEffect: 'shadow',
+      tuning: { ...DESKTOP_GLYPH_TUNING_DEFAULTS },
       fontPreset: 'inherit',
       fontSize: 32,
       color: 'auto',
@@ -37,8 +45,10 @@ let localStorage = {
     showLyricsTranslation: true,
     lyricsBackground: true,
     // 视觉深化（V0）：质量档 / 音频反应 / 强度 / 减少动态
-    // V2：visualMode = off（默认歌词页）| fume（Canvas 竖向歌词流）
+    // V2：visualMode = off（默认歌词页）| fume（Fume 歌词页）
     visualMode: 'off',
+    // 逐字歌词调参（主歌词页；桌面歌词有独立一份）
+    fumeTuning: { ...DEFAULT_GLYPH_TUNING },
     /** Fume 歌词页的呈现样式：sentence（单句）/ glyph（逐字） */
     fumeStyle: 'sentence',
     visualQuality: 'balanced',

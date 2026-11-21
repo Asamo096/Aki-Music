@@ -49,6 +49,7 @@
       <GlyphVisualizer
         v-if="glyphMode"
         :lines="lines"
+        :tuning="settings.fumeTuning"
         :active-index="highlightLyricIndex"
         :secondary="secondaryLyric"
         :time-provider="visualTimeProvider"
@@ -642,7 +643,10 @@ export default {
       ipcRenderer.on(CHANNELS.desktopSettings, (_event, patch) => {
         this.$store.commit('updateSettings', {
           key: 'desktopLyrics',
-          value: normalizeDesktopLyricsSettings(patch),
+          value: normalizeDesktopLyricsSettings({
+            ...this.settings.desktopLyrics,
+            ...patch,
+          }),
         });
       });
     }

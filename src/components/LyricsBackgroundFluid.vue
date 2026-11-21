@@ -17,7 +17,7 @@
     <div
       v-if="layers.length === 0"
       class="cover-fallback"
-      :style="{ backgroundColor: theme.backgroundColor }"
+      :style="{ backgroundColor: visualTheme.backgroundColor }"
     />
 
     <!-- 多颜色色块：颜色与运动速度都来自封面主题（见 visual/coverTheme.ts） -->
@@ -54,6 +54,7 @@ import { FALLBACK_COVER_THEME } from '@/visual/coverTheme';
 import { extractCoverTheme } from '@/visual/coverThemeExtract';
 import visualRuntime from '@/visual/runtime';
 import { resolveAudioLevel } from '@/visual/intensity';
+import { mixHexColors } from '@/visual/themeColorMath';
 
 /** 模糊源的最长边（见上方注释第 2 点） */
 const COVER_BLUR_SOURCE_MAX = 384;
@@ -116,7 +117,9 @@ export default {
   },
   data() {
     return {
+      // theme：目标主题（封面解析结果）；visualTheme：渲染用主题，切歌时插值过去
       theme: { ...FALLBACK_COVER_THEME },
+      visualTheme: { ...FALLBACK_COVER_THEME },
       layers: [],
       layerKey: 0,
     };
@@ -132,23 +135,21 @@ export default {
       );
     },
     blobStyle() {
+      // 颜色不在这里绑定：切歌时由 animateBlobTheme 在 450ms 内插值，避免色块瞬切
       return {
-        '--blob-primary': this.theme.primaryColor,
-        '--blob-secondary': this.theme.secondaryColor,
-        '--blob-accent': this.theme.accentColor,
-        '--blob-duration': `${this.theme.motionDuration}s`,
-        '--blob-strength': String(this.theme.blobStrength),
+        '--blob-duration': `${this.visualTheme.motionDuration}s`,
+        '--blob-strength': String(this.visualTheme.blobStrength),
       };
     },
     toneStyle() {
       return {
-        background: `linear-gradient(to bottom right, ${this.theme.primaryColor}, transparent, ${this.theme.secondaryColor})`,
+        background: `linear-gradient(to bottom right, ${this.visualTheme.primaryColor}, transparent, ${this.visualTheme.secondaryColor})`,
       };
     },
     veilStyle() {
       return {
-        backgroundColor: this.theme.backgroundColor,
-        opacity: String(this.theme.veilOpacity),
+        backgroundColor: this.visualTheme.backgroundColor,
+        opacity: String(this.visualTheme.veilOpacity),
       };
     },
   },
@@ -165,12 +166,84 @@ export default {
   },
   mounted() {
     this.setupAudioSubscription(this.audioReactiveEnabled);
+    this._blobColors = {
+      primary: this.visualTheme.primaryColor,
+      secondary: this.visualTheme.secondaryColor,
+      accent: this.visualTheme.accentColor,
+    };
+    this.applyBlobColors(this._blobColors);
   },
   beforeDestroy() {
     clearTimeout(this.pruneTimer);
+    if (this._themeRaf) cancelAnimationFrame(this._themeRaf);
     this.setupAudioSubscription(false);
   },
   methods: {
+    applyBlobColors(colors) {
+      const el = this.$el;
+      if (!el?.style) return;
+      el.style.setProperty('--blob-primary', colors.primary);
+      el.style.setProperty('--blob-secondary', colors.secondary);
+      el.style.setProperty('--blob-accent', colors.accent);
+    },
+    /** 切歌调色板过渡：450ms 内色块/遮罩/调和层一起插值，避免瞬切 */
+    animateBlobTheme(theme) {
+      const target = {
+        primary: theme.primaryColor,
+        secondary: theme.secondaryColor,
+        accent: theme.accentColor,
+        background: theme.backgroundColor,
+        veilOpacity: theme.veilOpacity,
+      };
+      const settings = this.$store?.state?.settings ?? {};
+      const reduceMotion =
+        settings.visualReduceMotion ||
+        (typeof window !== 'undefined' &&
+          window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+      if (reduceMotion || !this._blobColors) {
+        this._blobColors = {
+          primary: target.primary,
+          secondary: target.secondary,
+          accent: target.accent,
+        };
+        this.visualTheme = { ...theme };
+        this.applyBlobColors(this._blobColors);
+        return;
+      }
+      const from = {
+        ...this._blobColors,
+        background: this.visualTheme.backgroundColor,
+        veilOpacity: this.visualTheme.veilOpacity,
+      };
+      if (this._themeRaf) cancelAnimationFrame(this._themeRaf);
+      const startedAt = performance.now();
+      const duration = 450;
+      const step = now => {
+        const progress = Math.min(1, (now - startedAt) / duration);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        this._blobColors = {
+          primary: mixHexColors(from.primary, target.primary, eased),
+          secondary: mixHexColors(from.secondary, target.secondary, eased),
+          accent: mixHexColors(from.accent, target.accent, eased),
+        };
+        this.visualTheme = {
+          ...theme,
+          primaryColor: this._blobColors.primary,
+          secondaryColor: this._blobColors.secondary,
+          accentColor: this._blobColors.accent,
+          backgroundColor: mixHexColors(
+            from.background,
+            target.background,
+            eased
+          ),
+          veilOpacity:
+            from.veilOpacity + (target.veilOpacity - from.veilOpacity) * eased,
+        };
+        this.applyBlobColors(this._blobColors);
+        this._themeRaf = progress < 1 ? requestAnimationFrame(step) : 0;
+      };
+      this._themeRaf = requestAnimationFrame(step);
+    },
     setupAudioSubscription(enabled) {
       if (enabled && !this.unsubscribeAudio) {
         this.unsubscribeAudio = visualRuntime.subscribe(this.onAudioFrame);
@@ -211,6 +284,7 @@ export default {
       if (!url) {
         this.theme = { ...FALLBACK_COVER_THEME };
         this.layers = [];
+        this.animateBlobTheme(this.theme);
         return;
       }
 
@@ -221,6 +295,7 @@ export default {
         this.theme = theme;
         /** 主题回传：歌词页用它给逐字扫过染色 */
         this.$emit('theme', theme);
+        this.animateBlobTheme(theme);
       });
 
       const source =

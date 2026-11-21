@@ -35,6 +35,10 @@ export default {
     quality: { type: String, default: 'balanced' },
     /** 逐字排列：line / scatter */
     layout: { type: String, default: 'line' },
+    /** 逐字调参（桌面独立一份） */
+    tuning: { type: Object, default: () => ({}) },
+    /** 文字效果：shadow / outline / glow */
+    textEffect: { type: String, default: 'shadow' },
   },
   watch: {
     lines() {
@@ -68,6 +72,14 @@ export default {
       // 桌面逐字只有一种“直线”（上下交错 + 随机倾斜）
       this.renderer?.setOptions({ layout: 'line' });
     },
+    tuning(value) {
+      this.renderer?.setOptions({ tuning: value });
+    },
+    textEffect(value) {
+      this.renderer?.setOptions({
+        textEffect: value === 'outline' || value === 'glow' ? value : 'shadow',
+      });
+    },
   },
   mounted() {
     const canvas = this.$refs.canvas;
@@ -84,9 +96,9 @@ export default {
       showNextPreview: false,
       textColor: this.textColor,
       layout: 'line',
-      // 桌面歌词要跟得上唱词：入场约 0.2–0.3s，上一句 0.25s 淡出
-      entryDurationScale: 0.5,
+      tuning: this.tuning,
       exitDurationSeconds: 0.25,
+      textEffect: this.textEffect,
     };
     this.renderer =
       this.mode === 'glyph'

@@ -22,6 +22,7 @@ export default {
     fontSize: { type: Number, default: 28 },
     accent: { type: String, default: '' },
     theme: { type: String, default: 'dark' },
+    tuning: { type: Object, default: () => ({}) },
   },
   watch: {
     lines() {
@@ -47,6 +48,9 @@ export default {
         theme: value === 'light' ? 'light' : 'dark',
       });
     },
+    tuning(value) {
+      this.renderer?.setOptions({ tuning: value });
+    },
   },
   mounted() {
     const canvas = this.$refs.canvas;
@@ -58,6 +62,7 @@ export default {
       accent: this.accent,
       theme: this.theme === 'light' ? 'light' : 'dark',
       quality: this.$store?.state?.settings?.visualQuality || 'balanced',
+      tuning: this.tuning,
     });
     this.renderer.setData(this.lines, this.activeIndex);
     if (typeof window !== 'undefined') {

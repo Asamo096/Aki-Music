@@ -12,6 +12,11 @@
 import type { LyricLine } from '@/lyrics/types';
 import { getLineSecondaryText } from '@/lyrics/utils/text';
 import { buildGlyphTimings } from '@/visual/fume/layout';
+import {
+  DEFAULT_GLYPH_TUNING,
+  normalizeGlyphTuning,
+  type GlyphTuning,
+} from './tuning';
 
 export type GlyphSecondary = 'translation' | 'romaPronunciation' | 'none';
 
@@ -57,6 +62,8 @@ export interface GlyphLayoutOptions {
   secondary?: GlyphSecondary;
   /** 最终排列方式（默认 line） */
   layout?: GlyphRowLayoutMode;
+  /** 调参（倾斜/幅度/间距/入场/发光），缺省用默认值 */
+  tuning?: GlyphTuning;
   /** measure(text, fontSize) → 宽度 */
   measure: (text: string, fontSize: number) => number;
 }
@@ -189,9 +196,12 @@ export const tokenizeGlyphUnits = (text: string): GlyphUnit[] => {
 const fitUnitFontSize = (
   units: GlyphUnit[],
   options: GlyphLayoutOptions,
-  freeform: boolean
+  freeform: boolean,
+  tuning: GlyphTuning
 ): number => {
-  const spacingRatio = freeform ? 0.72 : 0.16;
+  const spacingRatio = freeform
+    ? Math.max(0.3, tuning.spacingRatio * 1.62)
+    : 0.16;
   const estimate = (size: number): number => {
     let width = 0;
     let count = 0;
@@ -227,7 +237,8 @@ export const buildGlyphRow = (
 
   const layoutMode: GlyphRowLayoutMode = options.layout ?? 'line';
   const freeform = layoutMode === 'line';
-  const fontSize = fitUnitFontSize(units, options, freeform);
+  const tuning = normalizeGlyphTuning(options.tuning);
+  const fontSize = fitUnitFontSize(units, options, freeform, tuning);
   const charTimings = buildGlyphTimings(line, chars);
   const lineStart = Number(line.startTime) || 0;
 
@@ -254,9 +265,11 @@ export const buildGlyphRow = (
 
   const seedKey = `${line.startTime ?? 0}:${index}:${text}`;
   const cells: GlyphCell[] = [];
-  const freeformBaseGap = fontSize * 0.44;
-  const freeformMinGap = fontSize * 0.26;
-  const freeformMaxGap = fontSize * 1.15;
+  const freeformBaseGap = fontSize * tuning.spacingRatio;
+  const freeformMinGap = fontSize * Math.max(0.16, tuning.spacingRatio * 0.59);
+  const freeformMaxGap = fontSize * Math.min(1.4, tuning.spacingRatio * 2.6);
+  const riseFactor = tuning.riseScale / DEFAULT_GLYPH_TUNING.riseScale;
+  const tiltMaxRad = (tuning.tiltMaxDeg * Math.PI) / 180;
   const waveSign = hashSeed(`${seedKey}:wave`) > 0.5 ? 1 : -1;
   const tiltWave = hashSeed(`${seedKey}:tiltWave`) > 0.5 ? 1 : -1;
   let cursor = 0;
@@ -282,10 +295,10 @@ export const buildGlyphRow = (
     const x = unitIndex === 0 ? 0 : cursor + spaceExtra + gap;
 
     const riseDirection = waveSign * (unitIndex % 2 === 0 ? 1 : -1);
-    const riseAmount = fontSize * (0.3 + Math.abs(riseSeed * 2 - 1) * 0.55);
+    const riseAmount =
+      fontSize * (0.3 + Math.abs(riseSeed * 2 - 1) * 0.55) * riseFactor;
     const tiltDirection = tiltWave * (unitIndex % 2 === 0 ? 1 : -1);
-    const tiltMagnitude =
-      GLYPH_MAX_TILT * (0.12 + 0.88 * Math.pow(tiltSeed, 2));
+    const tiltMagnitude = tiltMaxRad * (0.12 + 0.88 * Math.pow(tiltSeed, 2));
 
     cells.push({
       char: unit.text,

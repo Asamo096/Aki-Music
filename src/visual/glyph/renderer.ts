@@ -18,6 +18,8 @@ import {
   type GlyphRowLayoutMode,
   type GlyphSecondary,
 } from './layout';
+import { normalizeGlyphTuning, type GlyphTuning } from './tuning';
+import { getRelativeLuminance } from '@/visual/themeColorMath';
 
 export type GlyphQuality = 'high' | 'balanced' | 'low';
 
@@ -38,10 +40,14 @@ export interface GlyphRendererOptions {
   textColor?: string;
   /** 最终排列：plain（旧刚性线，仅主歌词页内部）/ line（上下交错 + 倾斜） */
   layout?: GlyphRowLayoutMode;
-  /** 入场动画时长缩放：桌面用更快的 0.5，主页面用 1 */
+  /** 入场动画时长缩放（tuning 旧字段，优先用 tuning.entryDurationScale） */
   entryDurationScale?: number;
   /** 上一句淡出时长（秒） */
   exitDurationSeconds?: number;
+  /** 逐字调参：倾斜/幅度/间距/入场/发光 */
+  tuning?: GlyphTuning;
+  /** 文字效果：shadow（默认）/ outline（描边）/ glow（柔光） */
+  textEffect?: 'shadow' | 'outline' | 'glow';
 }
 
 export interface GlyphDrawOptions {
@@ -106,13 +112,34 @@ export default class GlyphRenderer {
     if (!ctx) throw new Error('Glyph: 2d context unavailable');
     this.canvas = canvas;
     this.ctx = ctx;
-    this.options = { layout: 'line', ...options };
+    this.options = {
+      layout: 'line',
+      ...options,
+      tuning: normalizeGlyphTuning(options.tuning),
+    };
     this.resize(canvas.clientWidth || 1, canvas.clientHeight || 1);
   }
 
   setOptions(patch: Partial<GlyphRendererOptions>): void {
-    this.options = { ...this.options, ...patch };
+    this.options = {
+      ...this.options,
+      ...patch,
+      tuning: patch.tuning
+        ? normalizeGlyphTuning(
+            { ...this.options.tuning, ...patch.tuning },
+            this.options.tuning
+          )
+        : this.options.tuning,
+    };
     this.invalidate();
+    // 调参/字体/效果变化要立刻反映到当前句，不能等下一句；
+    // 单元格的入场时间来自歌词时间，重建布局不会重播已经完成的入场。
+    if (this.currentLayout) {
+      this.currentLayout = this.getLayout(this.currentLayout.index);
+    }
+    if (this.previousLayout) {
+      this.previousLayout = this.getLayout(this.previousLayout.index);
+    }
   }
 
   setData(lines: LyricLine[], activeIndex: number): void {
@@ -250,10 +277,19 @@ export default class GlyphRenderer {
       minFontSize: 30,
       secondary: this.options.secondary,
       layout: this.options.layout,
+      tuning: this.options.tuning,
       measure: (text, size) => this.measureAt(text, size),
     });
     this.layouts.set(index, layout);
     return layout;
+  }
+
+  private resolveOutlineColor(): string {
+    const color =
+      this.options.textColor ||
+      (this.options.theme === 'light' ? '#1a1a1c' : '#ffffff');
+    const luminance = getRelativeLuminance(color);
+    return luminance > 0.55 ? 'rgba(0,0,0,0.72)' : 'rgba(255,255,255,0.8)';
   }
 
   private resolveAccent(): string {
@@ -317,17 +353,33 @@ export default class GlyphRenderer {
     ctx.translate(rowStartX + pose.x + cell.width / 2, centerY + pose.y);
     ctx.rotate(pose.rotation);
     ctx.font = this.font(size);
+    const effect = this.options.textEffect || 'shadow';
     ctx.globalAlpha = pose.alpha;
     ctx.fillStyle = color;
-    if (dark) {
-      ctx.shadowColor = 'rgba(0,0,0,0.42)';
-      ctx.shadowBlur = 8;
-    }
-    if (glow > 0) {
+    if (effect === 'outline') {
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = Math.max(1.2, size * 0.045);
+      ctx.strokeStyle = this.resolveOutlineColor();
+      ctx.strokeText(cell.char, 0, 0);
+      ctx.fillText(cell.char, 0, 0);
+    } else if (effect === 'glow') {
       ctx.shadowColor = color;
-      ctx.shadowBlur = glow;
+      ctx.shadowBlur =
+        Math.max(6, 10 + (glow > 0 ? 8 : 0)) *
+        (this.options.tuning?.glowScale ?? 1);
+      ctx.fillText(cell.char, 0, 0);
+      ctx.shadowBlur = 0;
+    } else {
+      if (dark) {
+        ctx.shadowColor = 'rgba(0,0,0,0.42)';
+        ctx.shadowBlur = 8;
+      }
+      if (glow > 0) {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = glow;
+      }
+      ctx.fillText(cell.char, 0, 0);
     }
-    ctx.fillText(cell.char, 0, 0);
     ctx.restore();
   }
 
@@ -350,7 +402,9 @@ export default class GlyphRenderer {
       let pose = resolveGlyphPose(
         cell,
         now,
-        this.options.entryDurationScale ?? 1
+        this.options.tuning?.entryDurationScale ??
+          this.options.entryDurationScale ??
+          1
       );
       if (!pose) return;
       if (reduceMotion) {
@@ -372,8 +426,11 @@ export default class GlyphRenderer {
           rotation: pose.rotation + 0.05,
         };
       }
+      const glowScale = this.options.tuning?.glowScale ?? 1;
       const glow =
-        isLatest && this.options.quality !== 'low' ? 12 + level * 26 : 0;
+        isLatest && this.options.quality !== 'low'
+          ? (12 + level * 26) * glowScale
+          : 0;
       this.drawCell(
         cell,
         layout,

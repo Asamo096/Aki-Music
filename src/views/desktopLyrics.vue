@@ -16,6 +16,8 @@
       :playing="Boolean(state && state.playing)"
       :quality="payload?.style?.visualQuality || 'balanced'"
       :layout="desktopStyle.glyphLayout"
+      :tuning="desktopStyle.tuning"
+      :text-effect="textEffect"
     />
     <div v-else class="lyrics-band" :class="`position-${position}`">
       <LyricLines
@@ -55,6 +57,7 @@ import {
   normalizeDesktopLyricsSettings,
 } from '@/shared/lyricsSnapshot';
 import { createLyricPlayhead } from '@/lyrics/timing/playhead';
+import { getRelativeLuminance } from '@/visual/themeColorMath';
 
 export default {
   name: 'DesktopLyrics',
@@ -94,6 +97,15 @@ export default {
     visualStyle() {
       return this.desktopStyle.visualStyle;
     },
+    textEffect() {
+      return this.desktopStyle.textEffect;
+    },
+    outlineStroke() {
+      const luminance = getRelativeLuminance(this.canvasTextColor);
+      return luminance > 0.55
+        ? 'rgba(0, 0, 0, 0.72)'
+        : 'rgba(255, 255, 255, 0.8)';
+    },
     canvasFontFamily() {
       return (
         this.desktopResolved.resolvedFamily ||
@@ -116,8 +128,18 @@ export default {
         // 颜色：'auto' 时用封面主色（sweep），正文保持默认白
         color: desktop.colorHex || undefined,
         '--lyric-accent': desktop.sweep || style.accent || null,
-        // 压在任意壁纸上都要看得清
-        '--lyric-text-shadow': '0 2px 10px rgba(0, 0, 0, 0.82)',
+        // 压在任意壁纸上都要看得清；效果可在远程窗切换
+        '--lyric-text-shadow':
+          this.textEffect === 'outline'
+            ? 'none'
+            : this.textEffect === 'glow'
+            ? `0 0 18px ${
+                this.canvasAccent || '#ffffff'
+              }, 0 2px 10px rgba(0, 0, 0, 0.82)`
+            : '0 2px 10px rgba(0, 0, 0, 0.82)',
+        ...(this.textEffect === 'outline'
+          ? { '-webkit-text-stroke': `1px ${this.outlineStroke}` }
+          : {}),
         // 歌词带内部留白：视口高度由 CSS 固定，这里给一半
         '--lyric-spacer': '17vh',
       };
