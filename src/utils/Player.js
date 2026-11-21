@@ -7,7 +7,12 @@ import { getPlaylistDetail, intelligencePlaylist } from '@/api/playlist';
 import { getLyric, getMP3, getTrackDetail, scrobble } from '@/api/track';
 import store from '@/store';
 import { isAccountLoggedIn } from '@/utils/auth';
-import { cacheTrackSource, getTrackSource } from '@/utils/db';
+import {
+  cacheTrackSource,
+  getTrackSource,
+  hasCachedTrackSource,
+  prefetchCover,
+} from '@/utils/db';
 import { loadLyrics } from '@/lyrics';
 import requestScheduler, { isAbortError } from '@/net/requestScheduler';
 import { isCreateMpris, isCreateTray } from '@/utils/platform';
@@ -643,22 +648,27 @@ export default class {
       }
       return null;
     });
-    const sourcePromise = isAccountLoggedIn()
-      ? getMP3(nextTrackID, requestOptions).catch(error => {
-          if (!isAbortError(error)) {
-            console.debug('[Player] prefetch source failed', error);
-          }
-          return null;
-        })
-      : Promise.resolve(null);
+    // 已缓存音频就不再请求 /song/url，也不重复下载整首歌；
+    // 元数据表查询只有几十字节，不触碰音频 Blob。
+    const cachedPromise = hasCachedTrackSource(nextTrackID);
+    const sourcePromise = cachedPromise.then(cached => {
+      if (cached || !isAccountLoggedIn()) return null;
+      return getMP3(nextTrackID, requestOptions).catch(error => {
+        if (!isAbortError(error)) {
+          console.debug('[Player] prefetch source failed', error);
+        }
+        return null;
+      });
+    });
 
-    Promise.all([detailPromise, lyricPromise, sourcePromise])
-      .then(([detail, , mp3]) => {
+    Promise.all([detailPromise, lyricPromise, sourcePromise, cachedPromise])
+      .then(([detail, , mp3, cached]) => {
         if (controller.signal.aborted) return;
         const track = detail?.songs?.[0];
         if (!track) return;
-        if (track.al?.picUrl) {
-          this._prefetchCover(track.al.picUrl, controller.signal);
+        // 音频已缓存时封面通常也已预热过；重复下载只会增加图片缓存
+        if (!cached && track.al?.picUrl) {
+          prefetchCover(track.al.picUrl, controller.signal);
         }
         const item = mp3?.data?.[0];
         if (
@@ -683,22 +693,6 @@ export default class {
           this._prefetchingTrack = null;
         }
       });
-  }
-  /** 预热封面（浏览器 HTTP 缓存），不保留 Image 引用 */
-  _prefetchCover(picUrl, signal) {
-    if (typeof Image === 'undefined') return;
-    const url =
-      picUrl.slice(0, 5) === 'https' ? picUrl : `https${picUrl.slice(4)}`;
-    const image = new Image();
-    const cleanup = () => {
-      image.onload = null;
-      image.onerror = null;
-      signal?.removeEventListener('abort', cleanup);
-    };
-    image.onload = cleanup;
-    image.onerror = cleanup;
-    signal?.addEventListener('abort', cleanup, { once: true });
-    image.src = `${url}?param=224y224`;
   }
   _loadSelfFromLocalStorage() {
     const player = JSON.parse(localStorage.getItem('player'));

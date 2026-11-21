@@ -6,6 +6,12 @@ import Dexie from 'dexie';
 // 直接在开源前改名，避免把上游产品名带进用户数据路径。
 const db = new Dexie('akimusic');
 
+db.version(7).stores({
+  // 缓存元数据：只存字节数，启动统计缓存大小时不再读 1GB 级音频 Blob。
+  // 旧库首次启动由 repairTrackSourceMeta() 在空闲时逐条补齐。
+  trackSourceMeta: '&id',
+});
+
 db.version(6).stores({
   // 用户上传的歌词字体（M2-B）。存 Blob 本身：注册时用 FontFace 直接吃
   // ArrayBuffer，不需要文件路径，也就不需要额外的 IPC / 自定义协议。
@@ -62,20 +68,86 @@ const readCacheLimit = () => {
   }
 };
 
-// 初始化现有缓存总大小，确保应用启动时能正确判断并清理超限缓存。
-// 用 each 逐条累计，不把整库 Blob 一次性读进内存（缓存可能有数 GB）。
+let metaRepairPromise = null;
+
+const sumMetaBytes = async () => {
+  let bytes = 0;
+  await db.trackSourceMeta.each(meta => {
+    bytes += meta?.bytes || 0;
+  });
+  return bytes;
+};
+
+const scheduleIdle = task => {
+  if (typeof window === 'undefined') return;
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(task, { timeout: 5000 });
+  } else {
+    window.setTimeout(task, 3000);
+  }
+};
+
+/**
+ * 旧库一次性迁移：把已有 trackSources 的 byteLength 补进 trackSourceMeta。
+ * 放在启动后的空闲时间执行，避免为统计 1.19GB 缓存而阻塞首页。
+ */
+async function repairTrackSourceMeta() {
+  if (metaRepairPromise) return metaRepairPromise;
+  metaRepairPromise = (async () => {
+    const [sourceCount, metaCount] = await Promise.all([
+      db.trackSources.count(),
+      db.trackSourceMeta.count(),
+    ]);
+    if (metaCount >= sourceCount) return;
+
+    let pending = [];
+    await db.trackSources.each(async track => {
+      pending.push({
+        id: track.id,
+        bytes: track?.source?.byteLength || 0,
+      });
+      if (pending.length >= 200) {
+        const batch = pending;
+        pending = [];
+        await db.trackSourceMeta.bulkPut(batch);
+      }
+    });
+    if (pending.length) await db.trackSourceMeta.bulkPut(pending);
+
+    tracksCacheBytes = await sumMetaBytes();
+    console.debug(
+      '[debug][db.js] repairTrackSourceMeta done, total bytes:',
+      tracksCacheBytes
+    );
+    deleteExcessCache();
+  })()
+    .catch(error => {
+      console.debug('[debug][db.js] repairTrackSourceMeta failed', error);
+    })
+    .finally(() => {
+      metaRepairPromise = null;
+    });
+  return metaRepairPromise;
+}
+
+// 初始化缓存总大小：只读元数据；旧库在后台逐条补表，不阻塞启动。
 async function initTracksCacheBytes() {
   if (!process.env.IS_ELECTRON) return;
   try {
-    tracksCacheBytes = 0;
-    await db.trackSources.each(track => {
-      tracksCacheBytes += track?.source?.byteLength || 0;
-    });
+    tracksCacheBytes = await sumMetaBytes();
+    const [sourceCount, metaCount] = await Promise.all([
+      db.trackSources.count(),
+      db.trackSourceMeta.count(),
+    ]);
     console.debug(
       '[debug][db.js] initTracksCacheBytes, total bytes:',
       tracksCacheBytes
     );
-    deleteExcessCache();
+    if (metaCount < sourceCount) {
+      scheduleIdle(() => repairTrackSourceMeta());
+    } else {
+      deleteExcessCache();
+    }
   } catch (err) {
     console.debug('[debug][db.js] initTracksCacheBytes failed', err);
   }
@@ -95,6 +167,7 @@ async function deleteExcessCache() {
   try {
     const delCache = await db.trackSources.orderBy('createTime').first();
     await db.trackSources.delete(delCache.id);
+    await db.trackSourceMeta.delete(delCache.id);
     tracksCacheBytes -= delCache.source.byteLength;
     console.debug(
       `[debug][db.js] deleteExcessCacheSucces, track: ${delCache.name}, size: ${delCache.source.byteLength}, cacheSize:${tracksCacheBytes}`
@@ -116,6 +189,25 @@ async function deleteExcessCache() {
 const proxied = url =>
   /^https?:/i.test(url) ? `/proxy?url=${encodeURIComponent(url)}` : url;
 
+/** 只下载字节、不做图片解码：避免把封面解码位图推进 GPU 图片缓存 */
+export function prefetchCover(picUrl, signal) {
+  if (!process.env.IS_ELECTRON || !picUrl) return Promise.resolve();
+  let cover = picUrl;
+  if (cover.slice(0, 5) !== 'https') cover = 'https' + cover.slice(4);
+  return axios
+    .get(proxied(`${cover}?param=224y224`), {
+      responseType: 'arraybuffer',
+      signal,
+    })
+    .then(() => undefined)
+    .catch(() => undefined);
+}
+
+/** 判断音频是否已缓存（读元数据表，不读音频 Blob） */
+export function hasCachedTrackSource(id) {
+  return db.trackSourceMeta.get(Number(id)).then(meta => Boolean(meta));
+}
+
 export function cacheTrackSource(
   trackInfo,
   url,
@@ -133,17 +225,16 @@ export function cacheTrackSource(
   if (cover.slice(0, 5) !== 'https') {
     cover = 'https' + cover.slice(4);
   }
-  const coverOptions = { signal: options.signal };
-  axios.get(proxied(`${cover}?param=512y512`), coverOptions).catch(() => {});
-  axios.get(proxied(`${cover}?param=224y224`), coverOptions).catch(() => {});
-  axios.get(proxied(`${cover}?param=1024y1024`), coverOptions).catch(() => {});
+  // 只预热列表/播放条真正用到的 224 尺寸；512/1024 在歌词页/大图出现时
+  // 由浏览器按需加载。此前一次缓存会下载三张封面，放大图片缓存与请求量。
+  prefetchCover(cover, options.signal);
   return axios
     .get(proxied(url), {
       responseType: 'arraybuffer',
       signal: options.signal,
     })
     .then(response => {
-      db.trackSources.put({
+      const record = {
         id: trackInfo.id,
         source: response.data,
         bitRate,
@@ -151,11 +242,26 @@ export function cacheTrackSource(
         name,
         artist,
         createTime: new Date().getTime(),
+      };
+      const bytes = response.data.byteLength;
+      // 先读旧记录，重复缓存同一首时按差值累计，避免缓存统计虚高
+      return db.trackSources.get(trackInfo.id).then(previous => {
+        return db.trackSources
+          .put(record)
+          .then(() => db.trackSourceMeta.put({ id: trackInfo.id, bytes }))
+          .then(() => {
+            tracksCacheBytes += bytes - (previous?.source?.byteLength || 0);
+            console.debug(
+              `[debug][db.js] cached track 👉 ${name} by ${artist}`
+            );
+            deleteExcessCache();
+            return {
+              trackID: trackInfo.id,
+              source: response.data,
+              bitRate,
+            };
+          });
       });
-      console.debug(`[debug][db.js] cached track 👉 ${name} by ${artist}`);
-      tracksCacheBytes += response.data.byteLength;
-      deleteExcessCache();
-      return { trackID: trackInfo.id, source: response.data, bitRate };
     });
 }
 
@@ -264,31 +370,22 @@ export function getAlbumFromCache(id) {
   });
 }
 
-export function countDBSize() {
-  const trackSizes = [];
-  return db.trackSources
-    .each(track => {
-      trackSizes.push(track.source.byteLength);
-    })
-    .then(() => {
-      const res = {
-        bytes: trackSizes.reduce((s1, s2) => s1 + s2, 0),
-        length: trackSizes.length,
-      };
-      tracksCacheBytes = res.bytes;
-      console.debug(
-        `[debug][db.js] load tracksCacheBytes: ${tracksCacheBytes}`
-      );
-      return res;
-    });
+export async function countDBSize() {
+  const [length, metaCount] = await Promise.all([
+    db.trackSources.count(),
+    db.trackSourceMeta.count(),
+  ]);
+  // 旧库首次统计时补一次元数据；之后只读几十字节/条的 meta
+  if (metaCount < length) await repairTrackSourceMeta();
+  const bytes = await sumMetaBytes();
+  tracksCacheBytes = bytes;
+  console.debug(`[debug][db.js] load tracksCacheBytes: ${tracksCacheBytes}`);
+  return { bytes, length };
 }
 
 export function clearDB() {
-  return new Promise(resolve => {
-    db.tables.forEach(function (table) {
-      table.clear();
-    });
-    resolve();
+  return Promise.all(db.tables.map(table => table.clear())).then(() => {
+    tracksCacheBytes = 0;
   });
 }
 
