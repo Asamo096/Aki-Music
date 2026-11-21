@@ -8,6 +8,8 @@ import { getLyric, getMP3, getTrackDetail, scrobble } from '@/api/track';
 import store from '@/store';
 import { isAccountLoggedIn } from '@/utils/auth';
 import { cacheTrackSource, getTrackSource } from '@/utils/db';
+import { loadLyrics } from '@/lyrics';
+import requestScheduler, { isAbortError } from '@/net/requestScheduler';
 import { isCreateMpris, isCreateTray } from '@/utils/platform';
 import { PRODUCT_NAME } from '@/config/app';
 import { Howl, Howler } from 'howler';
@@ -91,6 +93,11 @@ export default class {
      * @type {string[]}
      */
     this.createdBlobRecords = [];
+
+    /** 当前播放请求序号/预取状态：异步结果回来时用于丢弃过期请求 */
+    this._replaceSeq = 0;
+    this._prefetchingTrack = null;
+    this._prefetchAbort = null;
 
     // howler (https://github.com/goldfire/howler.js)
     this._howler = null;
@@ -392,7 +399,9 @@ export default class {
     // Clean up the previous object URLs since we've created a new one.
     // Revoke object URLs can release the memory taken by a Blob,
     // which occupied a large proportion of memory.
-    for (const url in this.createdBlobRecords) {
+    // 注意必须用 for...of：for...in 遍历的是数组下标（"0"），
+    // 之前实际从未撤销过任何 URL，切歌时音频 Blob 会一直留在内存里。
+    for (const url of this.createdBlobRecords) {
       URL.revokeObjectURL(url);
     }
 
@@ -408,15 +417,17 @@ export default class {
       return this._getAudioSourceBlobURL(t.source);
     });
   }
-  _getAudioSourceFromNetease(track) {
+  _getAudioSourceFromNetease(track, options = {}) {
     if (isAccountLoggedIn()) {
-      return getMP3(track.id).then(result => {
+      return getMP3(track.id, options).then(result => {
         if (!result.data[0]) return null;
         if (!result.data[0].url) return null;
         if (result.data[0].freeTrialInfo !== null) return null; // 跳过只能试听的歌曲
         const source = result.data[0].url.replace(/^http:/, 'https:');
         if (store.state.settings.automaticallyCacheSongs) {
-          cacheTrackSource(track, source, result.data[0].br);
+          cacheTrackSource(track, source, result.data[0].br, 'netease', {
+            signal: options.signal,
+          }).catch(() => {});
         }
         return source;
       });
@@ -494,10 +505,10 @@ export default class {
     const buffer = base642Buffer(retrieveSongInfo.url);
     return this._getAudioSourceBlobURL(buffer);
   }
-  _getAudioSource(track) {
+  _getAudioSource(track, options = {}) {
     return this._getAudioSourceFromCache(String(track.id))
       .then(source => {
-        return source ?? this._getAudioSourceFromNetease(track);
+        return source ?? this._getAudioSourceFromNetease(track, options);
       })
       .then(source => {
         return source ?? this._getAudioSourceFromUnblockMusic(track);
@@ -508,27 +519,40 @@ export default class {
     autoplay = true,
     ifUnplayableThen = UNPLAYABLE_CONDITION.PLAY_NEXT_TRACK
   ) {
+    // 新的一次切歌开始：中止上一次的详情/音源请求，避免旧结果晚到覆盖新歌。
+    const seq = ++this._replaceSeq;
+    requestScheduler.cancelGroup('playback');
+    this._cancelPrefetch();
     if (autoplay && this._currentTrack.name) {
       this._scrobble(this.currentTrack, this._howler?.seek());
     }
-    return getTrackDetail(id).then(data => {
-      const track = data.songs[0];
-      // 曲目一旦切换，界面就立刻显示新歌了；旧音源必须**同一时刻**停掉。
-      // 否则在新音源下载完成前（网易云取不到时会走解锁插件，可能要数秒），
-      // 用户会听到上一首歌而界面已经是新歌 —— 表现为"播放的歌曲和播放页不符"。
-      if (autoplay && this._howler) {
-        this._howler.stop();
-      }
-      this._currentTrack = track;
-      this._updateMediaSessionMetaData(track);
-      listenTogetherService.onTrackChange();
-      return this._replaceCurrentTrackAudio(
-        track,
-        autoplay,
-        true,
-        ifUnplayableThen
-      );
-    });
+    return getTrackDetail(id, {
+      priority: 'P0',
+      group: 'playback',
+    })
+      .then(data => {
+        if (seq !== this._replaceSeq) return false;
+        const track = data.songs[0];
+        // 曲目一旦切换，界面就立刻显示新歌了；旧音源必须**同一时刻**停掉。
+        // 否则在新音源下载完成前（网易云取不到时会走解锁插件，可能要数秒），
+        // 用户会听到上一首歌而界面已经是新歌 —— 表现为"播放的歌曲和播放页不符"。
+        if (autoplay && this._howler) {
+          this._howler.stop();
+        }
+        this._currentTrack = track;
+        this._updateMediaSessionMetaData(track);
+        listenTogetherService.onTrackChange();
+        return this._replaceCurrentTrackAudio(
+          track,
+          autoplay,
+          true,
+          ifUnplayableThen
+        );
+      })
+      .catch(error => {
+        if (isAbortError(error)) return false;
+        throw error;
+      });
   }
   /**
    * @returns 是否成功加载音频，并使用加载完成的音频替换了howler实例
@@ -539,18 +563,20 @@ export default class {
     isCacheNextTrack,
     ifUnplayableThen = UNPLAYABLE_CONDITION.PLAY_NEXT_TRACK
   ) {
-    return this._getAudioSource(track).then(source => {
-      if (source) {
-        let replaced = false;
-        if (track.id === this.currentTrackID) {
-          this._playAudioSource(source, autoplay);
-          replaced = true;
+    const requestOptions = { priority: 'P0', group: 'playback' };
+    return this._getAudioSource(track, requestOptions)
+      .then(source => {
+        if (source) {
+          let replaced = false;
+          if (track.id === this.currentTrackID) {
+            this._playAudioSource(source, autoplay);
+            replaced = true;
+            // 只给真正上屏的当前曲目预取下一首；被取消的旧请求即使
+            // 从缓存里晚到，也不能再触发一次预取。
+            if (isCacheNextTrack) this._cacheNextTrack();
+          }
+          return replaced;
         }
-        if (isCacheNextTrack) {
-          this._cacheNextTrack();
-        }
-        return replaced;
-      } else {
         store.dispatch('showToast', `无法播放 ${track.name}`);
         switch (ifUnplayableThen) {
           case UNPLAYABLE_CONDITION.PLAY_NEXT_TRACK:
@@ -571,19 +597,108 @@ export default class {
             break;
         }
         return false;
-      }
-    });
+      })
+      .catch(error => {
+        if (isAbortError(error)) return false;
+        throw error;
+      });
   }
+  _cancelPrefetch() {
+    this._prefetchAbort?.abort();
+    this._prefetchAbort = null;
+    this._prefetchingTrack = null;
+  }
+  /**
+   * 预取下一首的「四件套」：详情 ∥ 歌词 ∥ 音源；封面 URL 来自详情，
+   * 详情一到位就并行预热。全部走 P2，播放路径（P0）永远优先。
+   */
   _cacheNextTrack() {
     let nextTrackID = this._isPersonalFM
       ? this._personalFMNextTrack?.id ?? 0
       : this._getNextTrack()[0];
     if (!nextTrackID) return;
     if (this._personalFMTrack.id == nextTrackID) return;
-    getTrackDetail(nextTrackID).then(data => {
-      let track = data.songs[0];
-      this._getAudioSource(track);
+    if (this._prefetchingTrack === nextTrackID) return;
+
+    this._prefetchAbort?.abort();
+    const controller = new AbortController();
+    this._prefetchAbort = controller;
+    this._prefetchingTrack = nextTrackID;
+
+    const requestOptions = {
+      priority: 'P2',
+      group: 'prefetch',
+      signal: controller.signal,
+    };
+    const detailPromise = getTrackDetail(nextTrackID, requestOptions);
+    const lyricPromise = loadLyrics(nextTrackID, {
+      ...requestOptions,
+      preferredLangs:
+        typeof navigator !== 'undefined' && navigator.language
+          ? [navigator.language]
+          : [],
+    }).catch(error => {
+      if (!isAbortError(error)) {
+        console.debug('[Player] prefetch lyric failed', error);
+      }
+      return null;
     });
+    const sourcePromise = isAccountLoggedIn()
+      ? getMP3(nextTrackID, requestOptions).catch(error => {
+          if (!isAbortError(error)) {
+            console.debug('[Player] prefetch source failed', error);
+          }
+          return null;
+        })
+      : Promise.resolve(null);
+
+    Promise.all([detailPromise, lyricPromise, sourcePromise])
+      .then(([detail, , mp3]) => {
+        if (controller.signal.aborted) return;
+        const track = detail?.songs?.[0];
+        if (!track) return;
+        if (track.al?.picUrl) {
+          this._prefetchCover(track.al.picUrl, controller.signal);
+        }
+        const item = mp3?.data?.[0];
+        if (
+          item?.url &&
+          !item.freeTrialInfo &&
+          store.state.settings.automaticallyCacheSongs
+        ) {
+          const url = item.url.replace(/^http:/, 'https:');
+          cacheTrackSource(track, url, item.br, 'netease', {
+            signal: controller.signal,
+          }).catch(() => {});
+        }
+      })
+      .catch(error => {
+        if (!isAbortError(error)) {
+          console.debug('[Player] prefetch failed', error);
+        }
+      })
+      .finally(() => {
+        if (this._prefetchAbort === controller) {
+          this._prefetchAbort = null;
+          this._prefetchingTrack = null;
+        }
+      });
+  }
+  /** 预热封面（浏览器 HTTP 缓存），不保留 Image 引用 */
+  _prefetchCover(picUrl, signal) {
+    if (typeof Image === 'undefined') return;
+    const url =
+      picUrl.slice(0, 5) === 'https' ? picUrl : `https${picUrl.slice(4)}`;
+    const image = new Image();
+    const cleanup = () => {
+      image.onload = null;
+      image.onerror = null;
+      signal?.removeEventListener('abort', cleanup);
+    };
+    image.onload = cleanup;
+    image.onerror = cleanup;
+    signal?.addEventListener('abort', cleanup, { once: true });
+    image.src = `${url}?param=224y224`;
   }
   _loadSelfFromLocalStorage() {
     const player = JSON.parse(localStorage.getItem('player'));

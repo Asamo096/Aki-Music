@@ -1,29 +1,32 @@
 import request from '@/utils/request';
 import { mapTrackPlayableStatus } from '@/utils/common';
 import { cacheAlbum, getAlbumFromCache } from '@/utils/db';
+import { requestKey } from '@/utils/requestCache';
 
 /**
  * 获取专辑内容
  * 说明 : 调用此接口 , 传入专辑 id, 可获得专辑内容
  * @param {number} id
  */
-export function getAlbum(id) {
-  const fetchLatest = () => {
-    return request({
+export function getAlbum(id, options = {}) {
+  const fetchLatest = () =>
+    request({
       url: '/album',
       method: 'get',
       params: {
         id,
       },
+      ...options,
+      dedupeKey: options.dedupeKey || requestKey('album', { id }),
     }).then(data => {
       cacheAlbum(id, data);
       data.songs = mapTrackPlayableStatus(data.songs);
       return data;
     });
-  };
-  fetchLatest();
 
   return getAlbumFromCache(id).then(result => {
+    // 缓存命中直接返回；未命中只发一次（此前会先无条件发一次，
+    // 未命中时再发一次完全相同的请求）
     return result ?? fetchLatest();
   });
 }

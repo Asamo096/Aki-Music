@@ -23,13 +23,16 @@ export interface LyricTier {
  */
 export async function resolveTiers(
   tiers: LyricTier[],
-  onFallback?: (tier: LyricTier, error: unknown) => void
+  onFallback?: (tier: LyricTier, error: unknown) => void,
+  signal?: AbortSignal
 ): Promise<LyricData | null> {
   for (const tier of tiers) {
+    if (signal?.aborted) return null;
     try {
       const data = await tier.load();
       if (data?.lines?.length) return data;
     } catch (error) {
+      if (signal?.aborted) return null;
       onFallback?.(tier, error);
     }
   }

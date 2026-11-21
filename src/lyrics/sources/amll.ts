@@ -2,7 +2,11 @@
 import type { LyricData } from '../types';
 import { parseLyricPayload } from '../core/parse';
 import { getLyricCacheEntry, putLyricCacheEntry } from '@/utils/db';
-import { dedupe, requestKey } from '@/utils/requestCache';
+import { requestKey } from '@/utils/requestCache';
+import requestScheduler, {
+  isAbortError,
+  type RequestPriority,
+} from '@/net/requestScheduler';
 
 /**
  * AMLL TTML DB 数据源（首选）。
@@ -42,9 +46,14 @@ function serialize<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
-async function fetchTtml(ncmId: string | number): Promise<string | null> {
+async function fetchTtml(
+  ncmId: string | number,
+  signal?: AbortSignal
+): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
   try {
     const res = await fetch(
       `${AMLL_API_BASE}/v1/lyrics/get?ncmMusicId=${encodeURIComponent(
@@ -62,7 +71,14 @@ async function fetchTtml(ncmId: string | number): Promise<string | null> {
     return typeof ttml === 'string' && ttml.includes('<tt') ? ttml : null;
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
   }
+}
+
+export interface LyricRequestOptions {
+  signal?: AbortSignal;
+  priority?: RequestPriority;
+  group?: string;
 }
 
 /**
@@ -72,8 +88,10 @@ async function fetchTtml(ncmId: string | number): Promise<string | null> {
  */
 export async function loadAmllLyrics(
   ncmId: string | number,
-  preferredLangs: string[] = []
+  preferredLangs: string[] = [],
+  options: LyricRequestOptions = {}
 ): Promise<LyricData | null> {
+  if (options.signal?.aborted) return null;
   const key = cacheKey(ncmId);
 
   const cached = await getLyricCacheEntry(key);
@@ -86,11 +104,22 @@ export async function loadAmllLyrics(
     }
   }
 
-  // 并发去重：同一首歌的多次请求共享一次网络往返
-  const ttml = await dedupe(requestKey('amll/lyrics', { ncmId }), () =>
-    serialize(() => fetchTtml(ncmId))
-  );
+  // 全局调度器负责并发去重与取消；AMLL 仍保持串行，避免触发限流
+  let ttml: string | null;
+  try {
+    ttml = await requestScheduler.schedule({
+      key: requestKey('amll/lyrics', { ncmId }),
+      priority: options.priority ?? 'P0',
+      group: options.group,
+      signal: options.signal,
+      run: taskSignal => serialize(() => fetchTtml(ncmId, taskSignal)),
+    });
+  } catch (error) {
+    if (isAbortError(error) || options.signal?.aborted) return null;
+    throw error;
+  }
 
+  if (options.signal?.aborted) return null;
   await putLyricCacheEntry(key, { payload: ttml, source: 'amll' });
   return ttml
     ? parseLyricPayload(ttml, { format: 'ttml', preferredLangs })

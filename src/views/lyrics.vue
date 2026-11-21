@@ -419,6 +419,7 @@ import LyricsAudioPulse from '@/components/LyricsAudioPulse.vue';
 import FumeVisualizer from '@/components/FumeVisualizer.vue';
 import GlyphVisualizer from '@/components/GlyphVisualizer.vue';
 import visualRuntime from '@/visual/runtime';
+import { isAbortError } from '@/net/requestScheduler';
 import {
   LYRIC_BACKGROUND_STYLES,
   isDarkBackgroundStyle,
@@ -685,6 +686,7 @@ export default {
     if (this.timer) {
       clearInterval(this.timer);
     }
+    this._lyricAbortController?.abort();
     this.exitFullscreen();
   },
   destroyed() {
@@ -772,6 +774,18 @@ export default {
       const isStale = () =>
         requestId !== this.lyricRequestId || this.currentTrack?.id !== track.id;
 
+      // 切歌/离开页面时中止旧请求：结果虽已被 requestId 丢弃，但连接与
+      // 队列槽位没必要继续占用。
+      this._lyricAbortController?.abort();
+      const controller = new AbortController();
+      this._lyricAbortController = controller;
+      const signal = controller.signal;
+      const requestOptions = {
+        signal,
+        priority: 'P0',
+        group: 'lyrics-page',
+      };
+
       const isCloudTrack =
         track.pc !== null &&
         track.cd === null &&
@@ -783,7 +797,8 @@ export default {
           //云盘未设置关联的歌曲获取其内置歌词
           const cloud = await getCloudLyric(
             track.id,
-            this.$store.state.data.user?.userId
+            this.$store.state.data.user?.userId,
+            requestOptions
           );
           data =
             cloud?.lrc?.length > 0
@@ -792,9 +807,11 @@ export default {
         } else {
           data = await loadLyrics(track.id, {
             preferredLangs: this.$i18n?.locale ? [this.$i18n.locale] : [],
+            ...requestOptions,
           });
         }
       } catch (error) {
+        if (isAbortError(error) || signal.aborted) return;
         console.warn('[lyrics] 取词失败', error);
         data = null;
       }

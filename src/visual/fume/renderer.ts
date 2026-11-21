@@ -354,6 +354,12 @@ export default class FumeRenderer {
 
   dispose(): void {
     this.disposed = true;
+    // 显式释放 canvas 后备存储：仅从 DOM 移除时，Chromium 可能把
+    // GPU 纹理留到下一次 GC，连续切换模式会看到 GPU 内存缓慢上涨。
+    if (this.canvas) {
+      this.canvas.width = 0;
+      this.canvas.height = 0;
+    }
     this.particles = [];
     this.layouts.clear();
     this.overviewLayout = null;

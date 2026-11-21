@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import request from '@/utils/request';
-import { dedupe, requestKey } from '@/utils/requestCache';
+import { requestKey } from '@/utils/requestCache';
+import type { LyricRequestOptions } from './amll';
 import { getLyricCacheEntry, putLyricCacheEntry } from '@/utils/db';
 import type { LyricData } from '../types';
 import { parseLyricPayload } from '../core/parse';
@@ -21,11 +22,18 @@ import { getLyric } from '@/api/track';
 const YRC_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const cacheKey = (trackId: string | number) => `yrc:${trackId}`;
 
-async function fetchLyricNew(trackId: string | number): Promise<unknown> {
+async function fetchLyricNew(
+  trackId: string | number,
+  options: LyricRequestOptions = {}
+): Promise<unknown> {
   return request({
     url: '/lyric/new',
     method: 'get',
     params: { id: trackId },
+    priority: options.priority ?? 'P0',
+    group: options.group,
+    signal: options.signal,
+    dedupeKey: requestKey('lyric/new', { id: trackId }),
   });
 }
 
@@ -35,8 +43,10 @@ async function fetchLyricNew(trackId: string | number): Promise<unknown> {
  * @returns 解析结果；歌曲没有逐字歌词（响应里 yrc 字段缺失）时返回 null
  */
 export async function loadNeteaseYrc(
-  trackId: string | number
+  trackId: string | number,
+  options: LyricRequestOptions = {}
 ): Promise<LyricData | null> {
+  if (options.signal?.aborted) return null;
   const key = cacheKey(trackId);
 
   const cached = await getLyricCacheEntry(key);
@@ -47,9 +57,7 @@ export async function loadNeteaseYrc(
     }
   }
 
-  const payload = await dedupe(requestKey('lyric/new', { id: trackId }), () =>
-    fetchLyricNew(trackId)
-  );
+  const payload = await fetchLyricNew(trackId, options);
 
   // 只有确实含逐字内容的响应才值得缓存
   const parsed = parseLyricPayload(payload);
@@ -67,9 +75,11 @@ export async function loadNeteaseYrc(
  * 复用既有的 getLyric —— 它自带缓存、去重与 60 秒新鲜度门控。
  */
 export async function loadNeteaseLrc(
-  trackId: string | number
+  trackId: string | number,
+  options: LyricRequestOptions = {}
 ): Promise<LyricData | null> {
+  if (options.signal?.aborted) return null;
   // getLyric（api/track.js）按数字 id 建缓存键，这里统一转换
-  const payload = await getLyric(Number(trackId));
+  const payload = await getLyric(Number(trackId), options);
   return parseLyricPayload(payload);
 }

@@ -1,6 +1,5 @@
 import axios from 'axios';
 import Dexie from 'dexie';
-import store from '@/store';
 // import pkg from "../../package.json";
 
 // IndexedDB 库名。上游名为 'yesplaymusic'；本项目没有存量用户，
@@ -46,33 +45,32 @@ db.version(1).stores({
 
 let tracksCacheBytes = 0;
 
-// 等待 settings 可用
-async function waitForSettingsReady(timeoutMs = 5000) {
-  const interval = 100;
-  const maxTries = Math.ceil(timeoutMs / interval);
-  let tries = 0;
-  while (
-    (store.state == null ||
-      store.state.settings == null ||
-      store.state.settings.cacheLimit === undefined) &&
-    tries < maxTries
-  ) {
-    await new Promise(resolve => setTimeout(resolve, interval));
-    tries++;
+/**
+ * 读取缓存上限（MB，false = 不限制）。
+ *
+ * 不直接 import store：db 被 store → Player → db 的循环引用波及，
+ * 模块初始化时 store 绑定尚未完成（TDZ），之前的启动日志错误就来自这里。
+ * settings 的持久化是同步的（store/plugins/localStorage），读 localStorage 等价且无环。
+ */
+const readCacheLimit = () => {
+  try {
+    if (typeof localStorage === 'undefined') return 8192;
+    const settings = JSON.parse(localStorage.getItem('settings'));
+    return settings?.cacheLimit ?? 8192;
+  } catch (error) {
+    return 8192;
   }
-  return store.state && store.state.settings;
-}
+};
 
-// 初始化现有缓存总大小，确保应用启动时能正确判断并清理超限缓存
+// 初始化现有缓存总大小，确保应用启动时能正确判断并清理超限缓存。
+// 用 each 逐条累计，不把整库 Blob 一次性读进内存（缓存可能有数 GB）。
 async function initTracksCacheBytes() {
   if (!process.env.IS_ELECTRON) return;
   try {
-    await waitForSettingsReady();
-    const all = await db.trackSources.toArray();
-    tracksCacheBytes = all.reduce(
-      (sum, t) => sum + (t?.source?.byteLength || 0),
-      0
-    );
+    tracksCacheBytes = 0;
+    await db.trackSources.each(track => {
+      tracksCacheBytes += track?.source?.byteLength || 0;
+    });
     console.debug(
       '[debug][db.js] initTracksCacheBytes, total bytes:',
       tracksCacheBytes
@@ -87,9 +85,10 @@ async function initTracksCacheBytes() {
 initTracksCacheBytes();
 
 async function deleteExcessCache() {
+  const cacheLimit = readCacheLimit();
   if (
-    store.state.settings.cacheLimit === false ||
-    tracksCacheBytes < store.state.settings.cacheLimit * Math.pow(1024, 2)
+    cacheLimit === false ||
+    tracksCacheBytes < Number(cacheLimit) * Math.pow(1024, 2)
   ) {
     return;
   }
@@ -117,7 +116,13 @@ async function deleteExcessCache() {
 const proxied = url =>
   /^https?:/i.test(url) ? `/proxy?url=${encodeURIComponent(url)}` : url;
 
-export function cacheTrackSource(trackInfo, url, bitRate, from = 'netease') {
+export function cacheTrackSource(
+  trackInfo,
+  url,
+  bitRate,
+  from = 'netease',
+  options = {}
+) {
   if (!process.env.IS_ELECTRON) return;
   const name = trackInfo.name;
   const artist =
@@ -128,12 +133,14 @@ export function cacheTrackSource(trackInfo, url, bitRate, from = 'netease') {
   if (cover.slice(0, 5) !== 'https') {
     cover = 'https' + cover.slice(4);
   }
-  axios.get(proxied(`${cover}?param=512y512`));
-  axios.get(proxied(`${cover}?param=224y224`));
-  axios.get(proxied(`${cover}?param=1024y1024`));
+  const coverOptions = { signal: options.signal };
+  axios.get(proxied(`${cover}?param=512y512`), coverOptions).catch(() => {});
+  axios.get(proxied(`${cover}?param=224y224`), coverOptions).catch(() => {});
+  axios.get(proxied(`${cover}?param=1024y1024`), coverOptions).catch(() => {});
   return axios
     .get(proxied(url), {
       responseType: 'arraybuffer',
+      signal: options.signal,
     })
     .then(response => {
       db.trackSources.put({

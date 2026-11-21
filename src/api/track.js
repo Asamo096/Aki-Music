@@ -1,7 +1,7 @@
 import store from '@/store';
 import request from '@/utils/request';
 import { mapTrackPlayableStatus } from '@/utils/common';
-import { dedupe, requestKey } from '@/utils/requestCache';
+import { requestKey } from '@/utils/requestCache';
 import {
   cacheTrackDetail,
   getTrackDetailFromCache,
@@ -24,7 +24,7 @@ const REVALIDATE_AFTER_MS = 60 * 1000;
  * !!!未登录状态返回试听片段(返回字段包含被截取的正常歌曲的开始时间和结束时间)
  * @param {string} id - 音乐的 id，例如 id=405998841,33894312
  */
-export function getMP3(id) {
+export function getMP3(id, options = {}) {
   const getBr = () => {
     // 当返回的 quality >= 400000时，就会优先返回 hi-res
     const quality = store.state.settings?.musicQuality ?? '320000';
@@ -38,6 +38,7 @@ export function getMP3(id) {
       id,
       br: getBr(),
     },
+    ...options,
   });
 }
 
@@ -46,28 +47,29 @@ export function getMP3(id) {
  * 说明 : 调用此接口 , 传入音乐 id(支持多个 id, 用 , 隔开), 可获得歌曲详情(注意:歌曲封面现在需要通过专辑内容接口获取)
  * @param {string} ids - 音乐 id, 例如 ids=405998841,33894312
  */
-export function getTrackDetail(ids) {
+export function getTrackDetail(ids, options = {}) {
   const idsInArray = typeof ids === 'string' ? ids.split(',') : [String(ids)];
-  // 键做归一化：同一批 id 顺序不同也视为同一次请求
+  // 键做归一化：同一批 id 顺序不同也视为同一次请求。
+  // 真正的并发合并在 request 层完成（全局调度器），这里只提供归一化键。
   const key = requestKey('song/detail', { ids: idsInArray });
 
   const fetchLatest = () =>
-    dedupe(key, () =>
-      request({
-        url: '/song/detail',
-        method: 'get',
-        params: {
-          ids,
-        },
-      }).then(data => {
-        data.songs.map(song => {
-          const privileges = data.privileges.find(t => t.id === song.id);
-          cacheTrackDetail(song, privileges);
-        });
-        data.songs = mapTrackPlayableStatus(data.songs, data.privileges);
-        return data;
-      })
-    );
+    request({
+      url: '/song/detail',
+      method: 'get',
+      params: {
+        ids,
+      },
+      ...options,
+      dedupeKey: options.dedupeKey || key,
+    }).then(data => {
+      data.songs.map(song => {
+        const privileges = data.privileges.find(t => t.id === song.id);
+        cacheTrackDetail(song, privileges);
+      });
+      data.songs = mapTrackPlayableStatus(data.songs, data.privileges);
+      return data;
+    });
 
   return getTrackDetailFromCache(idsInArray).then(result => {
     if (!result) {
@@ -88,22 +90,22 @@ export function getTrackDetail(ids) {
  * 说明 : 调用此接口 , 传入音乐 id 可获得对应音乐的歌词 ( 不需要登录 )
  * @param {number} id - 音乐 id
  */
-export function getLyric(id) {
+export function getLyric(id, options = {}) {
   const key = requestKey('lyric', { id });
 
   const fetchLatest = () =>
-    dedupe(key, () =>
-      request({
-        url: '/lyric',
-        method: 'get',
-        params: {
-          id,
-        },
-      }).then(result => {
-        cacheLyric(id, result);
-        return result;
-      })
-    );
+    request({
+      url: '/lyric',
+      method: 'get',
+      params: {
+        id,
+      },
+      ...options,
+      dedupeKey: options.dedupeKey || key,
+    }).then(result => {
+      cacheLyric(id, result);
+      return result;
+    });
 
   return getLyricFromCache(id).then(record => {
     if (!record) {
@@ -122,29 +124,29 @@ export function getLyric(id) {
  * @param {number} songId - 音乐 id
  * @param {number} userId - 用户 id
  */
-export function getCloudLyric(songId, userId) {
+export function getCloudLyric(songId, userId, options = {}) {
   const key = requestKey('cloud/lyric', { songId, userId });
 
   const fetchLatest = () =>
-    dedupe(key, () =>
-      request({
-        url: '/api',
-        method: 'get',
-        params: {
-          uri: `/api/cloud/lyric/get`,
-          data: {
-            songId,
-            userId,
-            lv: '-1',
-            kv: '-1',
-          },
-          crypto: 'eapi',
+    request({
+      url: '/api',
+      method: 'get',
+      params: {
+        uri: `/api/cloud/lyric/get`,
+        data: {
+          songId,
+          userId,
+          lv: '-1',
+          kv: '-1',
         },
-      }).then(result => {
-        cacheLyric(songId, result);
-        return result;
-      })
-    );
+        crypto: 'eapi',
+      },
+      ...options,
+      dedupeKey: options.dedupeKey || key,
+    }).then(result => {
+      cacheLyric(songId, result);
+      return result;
+    });
 
   return getLyricFromCache(songId).then(record => {
     if (!record) {
@@ -187,6 +189,7 @@ export function likeATrack(params) {
     url: '/like',
     method: 'get',
     params,
+    dedupe: false,
   });
 }
 
@@ -207,5 +210,6 @@ export function scrobble(params) {
     url: '/scrobble',
     method: 'get',
     params,
+    dedupe: false,
   });
 }

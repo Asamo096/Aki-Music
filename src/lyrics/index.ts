@@ -15,6 +15,7 @@
  * 本模块及其依赖**不引入 Vue / DOM**，可独立测试与复用（见 test/unit/lyricsEngine.spec.js）。
  */
 import type { LyricData, LyricSourceId } from './types';
+import type { RequestPriority } from '@/net/requestScheduler';
 import { resolveTiers, type LyricTier } from './sources/resolve';
 import { loadAmllLyrics } from './sources/amll';
 import { loadNeteaseLrc, loadNeteaseYrc } from './sources/netease';
@@ -50,6 +51,12 @@ export interface LoadLyricsOptions {
   skipAmll?: boolean;
   /** 降级时的回调，便于埋点/调试 */
   onFallback?: (source: LyricSourceId, error: unknown) => void;
+  /** 取消信号：切歌/离开页面时中止旧歌词请求 */
+  signal?: AbortSignal;
+  /** 请求优先级：当前曲目 P0，预取 P2 */
+  priority?: RequestPriority;
+  /** 调度器作用域标签 */
+  group?: string;
 }
 
 /** 按优先级装配各档数据源 */
@@ -63,11 +70,17 @@ function buildTiers(
   if (!skipAmll) {
     tiers.push({
       id: 'amll',
-      load: () => loadAmllLyrics(trackId, preferredLangs),
+      load: () => loadAmllLyrics(trackId, preferredLangs, options),
     });
   }
-  tiers.push({ id: 'netease-yrc', load: () => loadNeteaseYrc(trackId) });
-  tiers.push({ id: 'netease-lrc', load: () => loadNeteaseLrc(trackId) });
+  tiers.push({
+    id: 'netease-yrc',
+    load: () => loadNeteaseYrc(trackId, options),
+  });
+  tiers.push({
+    id: 'netease-lrc',
+    load: () => loadNeteaseLrc(trackId, options),
+  });
   return tiers;
 }
 
@@ -80,15 +93,21 @@ export async function loadLyrics(
   trackId: string | number,
   options: LoadLyricsOptions = {}
 ): Promise<LyricData | null> {
-  const { onFallback } = options;
-  const data = await resolveTiers(buildTiers(trackId, options), (tier, error) => {
-    console.warn(`[lyrics] ${tier.id} 取词失败，降级到下一档`, error);
-    onFallback?.(tier.id, error);
-  });
+  const { onFallback, signal } = options;
+  const data = await resolveTiers(
+    buildTiers(trackId, options),
+    (tier, error) => {
+      console.warn(`[lyrics] ${tier.id} 取词失败，降级到下一档`, error);
+      onFallback?.(tier.id, error);
+    },
+    signal
+  );
+
+  if (signal?.aborted) return null;
 
   // AMLL 那份逐字歌词常常不带翻译/罗马音，而网易云接口有 —— 补回来，
   // 否则相比旧歌词页会"丢翻译"（详见 core/enrich.ts 的注释）。
-  const enriched = await enrichSecondaryText(data, trackId);
+  const enriched = await enrichSecondaryText(data, trackId, options);
 
   // 统一在这里补渲染节奏提示，消费方（歌词页/桌面歌词）不必自己记着调用；
   // 已有且一致的 hints 会原样返回（见 renderHints.ts 的 migrate 逻辑）。
@@ -98,14 +117,15 @@ export async function loadLyrics(
 /** 只有"非网易云行级来源 + 缺副行文本"时才去补，避免重复请求已经用过的接口 */
 async function enrichSecondaryText(
   data: LyricData | null,
-  trackId: string | number
+  trackId: string | number,
+  options: LoadLyricsOptions = {}
 ): Promise<LyricData | null> {
   if (!data || data.source === 'netease-lrc' || hasSecondaryText(data)) {
     return data;
   }
 
   try {
-    const lrc = await loadNeteaseLrc(trackId);
+    const lrc = await loadNeteaseLrc(trackId, options);
     return mergeSecondaryText(data, lrc);
   } catch (error) {
     // 补翻译失败不影响主流程
