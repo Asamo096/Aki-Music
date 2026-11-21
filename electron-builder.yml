@@ -15,8 +15,13 @@ copyright: Copyright © Asamo096
 artifactName: aki-music-${os}-${version}-${arch}.${ext}
 asar: true
 
-# 发布源（publish）在 M5 配置本项目自己的仓库。
-# 上游原配置指向 qier222/YesPlayMusic，沿用会把安装包上传到上游的 Release。
+# 发布源：本项目的 GitHub Releases。electron-builder 会把这份配置写入
+# resources/app-update.yml，electron-updater 启动时据此检查更新。
+# 正式发布时用 GH_TOKEN=... pnpm electron:build --publish always。
+publish:
+  provider: github
+  owner: Asamo096
+  repo: Aki-Music
 
 directories:
   output: dist_electron
@@ -148,7 +153,9 @@ nsis:
   artifactName: aki-music-${version}-setup.${ext}
   oneClick: true
   perMachine: true
-  deleteAppDataOnUninstall: true
+  # 音乐应用的设置/缓存/一起听登录态都在用户数据目录；卸载不主动清空，
+  # 避免升级或误卸载导致用户数据丢失（用户可手动清理缓存）。
+  deleteAppDataOnUninstall: false
 
 portable:
   artifactName: aki-music-${version}-portable.${ext}

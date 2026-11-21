@@ -25,7 +25,9 @@
     "lint": "eslint --ext .js,.vue src",
     "prettier": "prettier --write ./src",
     "icons": "node scripts/generate-icons.mjs",
-    "netease_api:run": "npx @neteaseapireborn/api"
+    "netease_api:run": "npx @neteaseapireborn/api",
+    "release:win": "pnpm build:electron && electron-builder --config electron-builder.yml --win --publish never",
+    "release:win:publish": "pnpm build:electron && electron-builder --config electron-builder.yml --win --publish always"
   },
   "dependencies": {
     "@neteaseapireborn/api": "4.29.7",

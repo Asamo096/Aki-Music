@@ -483,28 +483,32 @@ class Background {
       return;
     }
 
+    autoUpdater.autoDownload = false;
+    if (!this._updateListenersBound) {
+      this._updateListenersBound = true;
+      autoUpdater.on('error', error => {
+        log(`update check failed: ${error?.message || error}`);
+      });
+      autoUpdater.on('update-available', info => {
+        dialog
+          .showMessageBox({
+            title: '发现新版本 v' + info.version,
+            message: '发现新版本 v' + info.version,
+            detail: '是否前往 GitHub 下载新版本安装包？',
+            buttons: ['下载', '取消'],
+            type: 'question',
+            noLink: true,
+          })
+          .then(result => {
+            if (result.response === 0) {
+              shell.openExternal(RELEASES_URL);
+            }
+          });
+      });
+    }
     log('checkForUpdates');
-    autoUpdater.checkForUpdatesAndNotify();
-
-    const showNewVersionMessage = info => {
-      dialog
-        .showMessageBox({
-          title: '发现新版本 v' + info.version,
-          message: '发现新版本 v' + info.version,
-          detail: '是否前往 GitHub 下载新版本安装包？',
-          buttons: ['下载', '取消'],
-          type: 'question',
-          noLink: true,
-        })
-        .then(result => {
-          if (result.response === 0) {
-            shell.openExternal(RELEASES_URL);
-          }
-        });
-    };
-
-    autoUpdater.on('update-available', info => {
-      showNewVersionMessage(info);
+    autoUpdater.checkForUpdates().catch(() => {
+      // error 事件已统一记录；这里只吞掉 Promise rejection
     });
   }
 

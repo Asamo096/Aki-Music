@@ -911,7 +911,15 @@
           >
           二次开发
         </p>
-        <p class="version">v{{ version }}</p>
+        <p class="version">
+          <a
+            v-if="repoUrl"
+            :href="`${repoUrl}/blob/main/LICENSE`"
+            target="_blank"
+            >AGPL-3.0</a
+          >
+          · v{{ version }}
+        </p>
 
         <a
           v-if="!isElectron"

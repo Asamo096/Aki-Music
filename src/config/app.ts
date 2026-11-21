@@ -17,9 +17,9 @@ export const PRODUCT_NAME: string = 'Aki Music';
  * 留空时，相关 UI 入口（导航栏 GitHub 按钮、帮助菜单项）自动隐藏，
  * 避免指向错误或不存在的地址。
  *
- * TODO(M5 发布前): 填入实际仓库地址，例如 'https://github.com/<owner>/aki-music'。
+ * M5：已填入本项目仓库。GitHub Releases 同时用作自动更新 feed。
  */
-export const REPO_URL: string = '';
+export const REPO_URL: string = 'https://github.com/Asamo096/Aki-Music';
 
 /** 发布页地址；REPO_URL 为空时同样为空。 */
 export const RELEASES_URL: string = REPO_URL ? `${REPO_URL}/releases` : '';
