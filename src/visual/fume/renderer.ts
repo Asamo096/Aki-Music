@@ -40,7 +40,7 @@ export interface FumeRendererOptions {
   showShapes?: boolean;
   /** 是否显示下一句预览（桌面默认关闭） */
   showNextPreview?: boolean;
-  /** 间奏是否展示 overview（桌面默认关闭） */
+  /** 前奏是否展示 overview（桌面默认关闭；句末/间奏不再切 overview） */
   showOverview?: boolean;
   /** 正文颜色覆盖（桌面歌词自定义颜色） */
   textColor?: string;
@@ -183,8 +183,11 @@ export default class FumeRenderer {
 
   private activeIndex = -1;
 
-  /** 最近一个有效行：间奏淡出时仍画这一句，避免跳到第 0 句 */
+  /** 最近一个有效行：句末/间奏时保持这一句，不切到 overview */
   private focusIndex = 0;
+
+  /** 是否已经聚焦过至少一句（区分前奏 overview 与句末保持） */
+  private hasFocusedLine = false;
 
   private width = 0;
 
@@ -230,13 +233,23 @@ export default class FumeRenderer {
     const changed = lines !== this.lines;
     this.lines = lines;
     this.activeIndex = activeIndex;
-    if (activeIndex >= 0) this.focusIndex = activeIndex;
-    if (changed) this.invalidateLayouts();
+    if (activeIndex >= 0) {
+      this.focusIndex = activeIndex;
+      this.hasFocusedLine = true;
+    }
+    if (changed) {
+      this.hasFocusedLine = activeIndex >= 0;
+      if (!this.hasFocusedLine) this.focusIndex = 0;
+      this.invalidateLayouts();
+    }
   }
 
   setActiveIndex(index: number): void {
     this.activeIndex = index;
-    if (index >= 0) this.focusIndex = index;
+    if (index >= 0) {
+      this.focusIndex = index;
+      this.hasFocusedLine = true;
+    }
   }
 
   resize(cssWidth: number, cssHeight: number): void {
@@ -269,7 +282,12 @@ export default class FumeRenderer {
     const dark = this.options.theme !== 'light';
     const baseColor = this.options.textColor || (dark ? '#ffffff' : '#1c1c1e');
     const accent = this.resolveAccent();
-    const focusTarget = this.activeIndex >= 0 && this.lines.length ? 1 : 0;
+    // 已经唱过至少一句且当前时间已到该句：句末/间奏保持这一句（不再切到 overview）
+    const focusLine = this.lines[this.focusIndex];
+    const focusLineStart = Number(focusLine?.startTime) || 0;
+    const holdActive =
+      this.hasFocusedLine && Boolean(focusLine) && now >= focusLineStart;
+    const focusTarget = holdActive ? 1 : 0;
     if (reduceMotion) {
       this.focusAmount = focusTarget;
     } else {
@@ -291,7 +309,12 @@ export default class FumeRenderer {
     if (focusTarget || this.focusAmount > 0) {
       this.drawFocusLine(now, level, accent, baseColor, dark);
     }
-    if (this.focusAmount < 1 && this.options.showOverview !== false) {
+    // overview 只用于前奏（还没有开始第一句）；句末/间奏保持最后一句
+    if (
+      !holdActive &&
+      this.focusAmount < 1 &&
+      this.options.showOverview !== false
+    ) {
       this.drawOverview(now, this.focusAmount, accent, baseColor, dark);
     }
     if (!this.options.transparent) this.drawEdgeFade();
