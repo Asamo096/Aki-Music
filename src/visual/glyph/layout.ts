@@ -18,6 +18,9 @@ export type GlyphSecondary = 'translation' | 'romaPronunciation' | 'none';
 /** 最终排列方式：plain = 旧刚性直线（仅主歌词页内部使用）；line = 上下交错 + 随机倾斜 */
 export type GlyphRowLayoutMode = 'plain' | 'line';
 
+/** 单字最大倾斜角：18°（再大就不美观了） */
+export const GLYPH_MAX_TILT = Math.PI / 10;
+
 export interface GlyphCell {
   char: string;
   startTime: number;
@@ -155,7 +158,8 @@ export const buildGlyphRow = (
   const freeformMaxGap = fontSize * 1.15;
   // 一句话的起伏方向：偶数位/奇数位交错，整体随机从哪一边开始
   const waveSign = hashSeed(`${seedKey}:wave`) > 0.5 ? 1 : -1;
-  const MAX_TILT = Math.PI / 3; // 0–60°
+  // 倾斜：左右均衡（奇偶交错），最大 ±18°，且多数角度更接近 0
+  const tiltWave = hashSeed(`${seedKey}:tiltWave`) > 0.5 ? 1 : -1;
   let cursor = 0;
   chars.forEach((char, charIndex) => {
     const time = glyphTimings[charIndex]?.startTime ?? 0;
@@ -175,9 +179,13 @@ export const buildGlyphRow = (
             freeformMaxGap
           )
         : cursor;
-    // 直线（上下交错）：奇偶交错地浮上去/沉下去，幅度 0.3–0.85 字号；角度左右随机 0–60°
+    // 直线（上下交错）：奇偶交错地浮上去/沉下去，幅度 0.3–0.85 字号
     const riseDirection = waveSign * (charIndex % 2 === 0 ? 1 : -1);
     const riseAmount = fontSize * (0.3 + Math.abs(riseSeed * 2 - 1) * 0.55);
+    // 倾斜：左右交替，幅度偏向小角度（0–18°）
+    const tiltDirection = tiltWave * (charIndex % 2 === 0 ? 1 : -1);
+    const tiltMagnitude =
+      GLYPH_MAX_TILT * (0.12 + 0.88 * Math.pow(tiltSeed, 2));
     cells.push({
       char,
       startTime: time,
@@ -188,7 +196,7 @@ export const buildGlyphRow = (
         ? riseDirection * riseAmount
         : (jitterSeed - 0.5) * fontSize * 0.14,
       rotation: freeform
-        ? (tiltSeed * 2 - 1) * MAX_TILT
+        ? tiltDirection * tiltMagnitude
         : (jitterSeed * 2 - 1) * 0.035,
       fromX: (fromSeed * 2 - 1) * Math.min(320, options.maxWidth * 0.24),
       fromY:

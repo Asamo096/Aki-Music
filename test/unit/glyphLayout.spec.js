@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GLYPH_MAX_TILT,
   buildGlyphRow,
   easeOutBack,
   fitGlyphFontSize,
@@ -134,7 +135,7 @@ describe('glyph layout line (rise/sink)', () => {
     expect(a.width).toBeLessThanOrEqual(1200);
   });
 
-  it('直线排列有的字浮上去、有的沉下去，角度不超过 60°', () => {
+  it('直线排列有的字浮上去、有的沉下去，倾斜在 ±18° 内且左右均衡', () => {
     const row = buildGlyphRow(line('上下浮动测试', 0, 3), 0, {
       maxWidth: 1600,
       baseFontSize: 60,
@@ -145,10 +146,12 @@ describe('glyph layout line (rise/sink)', () => {
     const ys = row.cells.map(c => c.y);
     expect(Math.max(...ys)).toBeGreaterThan(row.fontSize * 0.2);
     expect(Math.min(...ys)).toBeLessThan(-row.fontSize * 0.2);
-    const tilts = row.cells.map(c => Math.abs(c.rotation));
-    expect(Math.max(...tilts)).toBeGreaterThan(0.5);
-    expect(Math.max(...tilts)).toBeLessThanOrEqual(Math.PI / 3 + 1e-6);
-    expect(Math.max(...tilts)).toBeGreaterThan(Math.PI / 12);
+    const rotations = row.cells.map(c => c.rotation);
+    const maxAbs = Math.max(...rotations.map(value => Math.abs(value)));
+    expect(maxAbs).toBeGreaterThan(GLYPH_MAX_TILT * 0.4);
+    expect(maxAbs).toBeLessThanOrEqual(GLYPH_MAX_TILT + 1e-6);
+    expect(rotations.some(value => value > 0.02)).toBe(true);
+    expect(rotations.some(value => value < -0.02)).toBe(true);
   });
 
   it('直线排列的纵向/旋转抖动比旧刚性线明显', () => {
