@@ -23,6 +23,8 @@ export default {
     accent: { type: String, default: '' },
     theme: { type: String, default: 'dark' },
     tuning: { type: Object, default: () => ({}) },
+    /** 为 false 时组件保留 canvas/上下文但不绘制（模式切换复用，避免 GPU 纹理反复创建） */
+    active: { type: Boolean, default: true },
   },
   watch: {
     lines() {
@@ -50,6 +52,13 @@ export default {
     },
     tuning(value) {
       this.renderer?.setOptions({ tuning: value });
+    },
+    active(value) {
+      if (!value) return;
+      this.$nextTick(() => {
+        this.handleResize();
+        this.renderer?.setOptions({});
+      });
     },
   },
   mounted() {
@@ -120,7 +129,7 @@ export default {
       this.renderer.resize(width, height);
     },
     onFrame({ dt, audio }) {
-      if (!this.renderer) return;
+      if (!this.renderer || !this.active) return;
       const settings = this.$store?.state?.settings ?? {};
       const quality = settings.visualQuality || 'balanced';
       if (quality !== this._quality) {
@@ -165,6 +174,12 @@ export default {
 
 <style lang="scss" scoped>
 .glyph-canvas {
+  transition: opacity 0.18s ease;
+
+  &.is-inactive {
+    opacity: 0;
+    pointer-events: none;
+  }
   position: absolute;
   inset: 0;
   width: 100%;

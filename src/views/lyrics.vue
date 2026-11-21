@@ -47,7 +47,9 @@
 
       <!-- Fume 模式（V2）：Canvas 2D 竖向歌词流，替换 DOM 歌词区 -->
       <GlyphVisualizer
-        v-if="glyphMode"
+        v-if="glyphMounted"
+        :class="{ 'is-inactive': !glyphMode }"
+        :active="glyphMode"
         :lines="lines"
         :tuning="settings.fumeTuning"
         :active-index="highlightLyricIndex"
@@ -61,7 +63,9 @@
       />
 
       <FumeVisualizer
-        v-if="fumeMode"
+        v-if="fumeMounted"
+        :class="{ 'is-inactive': !fumeMode }"
+        :active="fumeMode"
         :lines="lines"
         :active-index="highlightLyricIndex"
         :has-word-timing="hasWordTiming"
@@ -480,6 +484,9 @@ export default {
       date: this.formatTime(new Date()),
       isFullscreen: !!document.fullscreenElement,
       rightClickLyric: null,
+      /** 画布一旦用过就保留（v-show 复用），避免反复销毁/创建 GPU 纹理 */
+      glyphMounted: false,
+      fumeMounted: false,
     };
   },
   computed: {
@@ -517,7 +524,9 @@ export default {
       },
     },
     imageUrl() {
-      return this.player.currentTrack?.al?.picUrl + '?param=1024y1024';
+      // 歌词页封面显示尺寸远小于 1024；用 512 可把解码后的纹理内存
+      // 降到约 1/4，1024 只留给真正的大图场景（如每日推荐首图）。
+      return this.player.currentTrack?.al?.picUrl + '?param=512y512';
     },
     bgImageUrl() {
       return this.player.currentTrack?.al?.picUrl + '?param=512y512';
@@ -588,6 +597,18 @@ export default {
     },
   },
   watch: {
+    glyphMode: {
+      immediate: true,
+      handler(active) {
+        if (active) this.glyphMounted = true;
+      },
+    },
+    fumeMode: {
+      immediate: true,
+      handler(active) {
+        if (active) this.fumeMounted = true;
+      },
+    },
     currentTrack() {
       // 先清空：新歌词到达前（AMLL 最坏 5s）不能继续显示上一首的词
       this.lyricData = null;

@@ -7,8 +7,8 @@
  *   node scripts/verify-resources.mjs
  *
  * 验证两件事：
- *   1. 视觉模式 off ↔ Fume ↔ 逐字 连续切换后，canvas / 渲染器句柄 / 运行时订阅者
- *      没有残留；
+ *   1. 视觉模式 off ↔ Fume ↔ 逐字 连续切换时，画布被复用（最多 2 个，
+ *      非激活时 opacity 0），没有反复创建/销毁合成层；
  *   2. 连续切歌后，旧的音频 Blob URL 真正被 revoke（而不是只有最后一个），
  *      JS 堆在 GC 后回到稳定范围。
  *
@@ -153,6 +153,9 @@ const main = async () => {
         cycles: ${CANVAS_CYCLES},
         maxCanvases,
         canvasesLeft: document.querySelectorAll('canvas').length,
+        canvasesVisible: [...document.querySelectorAll('canvas')].filter(
+          canvas => getComputedStyle(canvas).opacity !== '0'
+        ).length,
         glyphHandleLeft: Boolean(window.__akiGlyph),
         fumeHandleLeft: Boolean(window.__akiFume),
         runtime: window.__akiVisualRuntime?.getState() || null
@@ -273,10 +276,12 @@ const main = async () => {
         audioWs == null || canvasWs == null ? null : audioWs - canvasWs,
     },
     checks: {
-      canvasHandlesCleared:
-        canvasResult.canvasesLeft === 0 &&
-        !canvasResult.glyphHandleLeft &&
-        !canvasResult.fumeHandleLeft,
+      // V3-GPU：画布会被复用（v-show 保留上下文），检查的是
+      // 「最多 2 个画布、关闭后全部隐藏」，而不是每次销毁重建。
+      canvasReuseOk:
+        canvasResult.maxCanvases <= 2 &&
+        canvasResult.canvasesVisible === 0 &&
+        canvasResult.canvasesLeft <= 2,
       blobUrlsRecycled: (audioResult.liveBlobUrls ?? 99) <= 2,
       canvasHeapStable:
         canvasHeap == null ||

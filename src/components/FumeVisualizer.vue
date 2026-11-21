@@ -52,6 +52,8 @@ export default {
       type: String,
       default: 'dark',
     },
+    /** 为 false 时保留 canvas/上下文但不绘制，供模式切换复用 */
+    active: { type: Boolean, default: true },
   },
   watch: {
     lines() {
@@ -75,6 +77,13 @@ export default {
     theme(value) {
       this.renderer?.setOptions({
         theme: value === 'light' ? 'light' : 'dark',
+      });
+    },
+    active(value) {
+      if (!value) return;
+      this.$nextTick(() => {
+        this.handleResize();
+        this.renderer?.setOptions({});
       });
     },
   },
@@ -146,7 +155,7 @@ export default {
       this.renderer.resize(width, height);
     },
     onFrame({ dt, audio }) {
-      if (!this.renderer) return;
+      if (!this.renderer || !this.active) return;
       const settings = this.$store?.state?.settings ?? {};
       const quality = settings.visualQuality || 'balanced';
       if (quality !== this._quality) {
@@ -191,6 +200,12 @@ export default {
 
 <style lang="scss" scoped>
 .fume-canvas {
+  transition: opacity 0.18s ease;
+
+  &.is-inactive {
+    opacity: 0;
+    pointer-events: none;
+  }
   position: absolute;
   inset: 0;
   width: 100%;
